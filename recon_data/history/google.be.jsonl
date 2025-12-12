@@ -1,0 +1,90 @@
+{"ts": "2025-12-11T12:19:55.508346+00:00", "source": "scheduler", "text": "Job dispatched to worker."}
+{"ts": "2025-12-11T12:19:55.508094+00:00", "source": "RUNNING", "text": "Recon started."}
+{"ts": "2025-12-11T12:19:55.520504+00:00", "source": "amass", "text": "[amass] Amass already completed."}
+{"ts": "2025-12-11T12:19:55.520763+00:00", "source": "subfinder", "text": "[subfinder] Subfinder already completed."}
+{"ts": "2025-12-11T12:19:55.520833+00:00", "source": "assetfinder", "text": "[assetfinder] Assetfinder already completed."}
+{"ts": "2025-12-11T12:19:55.521114+00:00", "source": "findomain", "text": "[findomain] Findomain in progress\u2026"}
+{"ts": "2025-12-11T12:19:55.525467+00:00", "source": "subfinder", "text": "subfinder added 14 new subdomains."}
+{"ts": "2025-12-11T12:19:55.527213+00:00", "source": "sublist3r", "text": "[sublist3r] Sublist3r in progress\u2026"}
+{"ts": "2025-12-11T12:19:55.534525+00:00", "source": "findomain", "text": "$ findomain --target google.be --threads 40 --quiet --output recon_data/findomain_google.be.txt"}
+{"ts": "2025-12-11T12:19:55.663918+00:00", "source": "ffuf", "text": "[ffuf] Wordlist missing; ffuf skipped."}
+{"ts": "2025-12-11T12:19:55.671954+00:00", "source": "httpx", "text": "[httpx] httpx scanning 14 new hosts"}
+{"ts": "2025-12-11T12:19:55.672400+00:00", "source": "httpx", "text": "$ httpx -l recon_data/subs_google.be_httpx_batch.txt -json -o recon_data/httpx_google.be.json -timeout 10 -follow-redirects -v"}
+{"ts": "2025-12-11T12:19:55.805656+00:00", "source": "FINDOMAIN stderr", "text": "error: unexpected argument 'recon_data/findomain_google.be.txt' found"}
+{"ts": "2025-12-11T12:19:55.805656+00:00", "source": "FINDOMAIN stderr", "text": "Usage: findomain [OPTIONS]"}
+{"ts": "2025-12-11T12:19:55.805656+00:00", "source": "FINDOMAIN stderr", "text": "For more information, try '--help'."}
+{"ts": "2025-12-11T12:19:55.948248+00:00", "source": "httpx", "text": "The httpx command line client could not run because the required dependencies were not installed."}
+{"ts": "2025-12-11T12:19:55.948248+00:00", "source": "httpx", "text": "Make sure you've installed everything with: pip install 'httpx[cli]'"}
+{"ts": "2025-12-11T12:19:55.993559+00:00", "source": "httpx", "text": "httpx batch failed."}
+{"ts": "2025-12-11T12:20:03.861670+00:00", "source": "findomain", "text": "Findomain identified 0 subdomains."}
+{"ts": "2025-12-11T12:20:03.862388+00:00", "source": "findomain", "text": "[findomain] Findomain found 0 subdomains."}
+{"ts": "2025-12-11T12:20:03.960318+00:00", "source": "sublist3r", "text": "Sublist3r identified 0 subdomains."}
+{"ts": "2025-12-11T12:20:03.960493+00:00", "source": "sublist3r", "text": "[sublist3r] Sublist3r found 0 subdomains."}
+{"ts": "2025-12-11T12:20:06.077075+00:00", "source": "httpx", "text": "[httpx] httpx scan finished."}
+{"ts": "2025-12-11T12:20:06.082191+00:00", "source": "nuclei", "text": "[nuclei] nuclei scanning 14 new hosts"}
+{"ts": "2025-12-11T12:20:06.082607+00:00", "source": "scheduler", "text": "Waiting for nuclei slot..."}
+{"ts": "2025-12-11T12:20:06.082673+00:00", "source": "scheduler", "text": "nuclei slot acquired."}
+{"ts": "2025-12-11T12:20:06.082885+00:00", "source": "nuclei", "text": "$ nuclei -l recon_data/subs_google.be_nuclei_batch.txt -json -o recon_data/nuclei_google.be.json -v"}
+{"ts": "2025-12-11T12:20:07.370361+00:00", "source": "nuclei", "text": "flag provided but not defined: -json"}
+{"ts": "2025-12-11T12:20:07.414401+00:00", "source": "nuclei", "text": "nuclei batch failed."}
+{"ts": "2025-12-11T12:20:07.461442+00:00", "source": "nuclei", "text": "[nuclei] nuclei scan finished."}
+{"ts": "2025-12-11T12:20:07.477148+00:00", "source": "nikto", "text": "[nikto] Nikto scanning 14 new hosts"}
+{"ts": "2025-12-11T12:20:07.477372+00:00", "source": "scheduler", "text": "Waiting for Nikto slot..."}
+{"ts": "2025-12-11T12:20:07.477432+00:00", "source": "scheduler", "text": "Nikto slot acquired."}
+{"ts": "2025-12-11T12:20:07.477584+00:00", "source": "nikto", "text": "Nikto scanning http://adssettings.google.be"}
+{"ts": "2025-12-11T12:20:07.568577+00:00", "source": "nikto", "text": "Nikto scanning http://adwords.google.be"}
+{"ts": "2025-12-11T12:20:07.616752+00:00", "source": "nikto", "text": "Nikto scanning http://ampcid.google.be"}
+{"ts": "2025-12-11T12:20:07.664872+00:00", "source": "nikto", "text": "Nikto scanning http://cctldtest.google.be"}
+{"ts": "2025-12-11T12:20:07.714566+00:00", "source": "nikto", "text": "Nikto scanning http://clients6.google.be"}
+{"ts": "2025-12-11T12:20:07.762586+00:00", "source": "nikto", "text": "Nikto scanning http://consent.google.be"}
+{"ts": "2025-12-11T12:20:07.813867+00:00", "source": "nikto", "text": "Nikto scanning http://cse.google.be"}
+{"ts": "2025-12-11T12:20:07.862832+00:00", "source": "nikto", "text": "Nikto scanning http://id.google.be"}
+{"ts": "2025-12-11T12:20:07.912365+00:00", "source": "nikto", "text": "Nikto scanning http://privacy.google.be"}
+{"ts": "2025-12-11T12:20:07.961544+00:00", "source": "nikto", "text": "Nikto scanning http://sandbox.google.be"}
+{"ts": "2025-12-11T12:20:08.010209+00:00", "source": "nikto", "text": "Nikto scanning http://shopping.google.be"}
+{"ts": "2025-12-11T12:20:08.059090+00:00", "source": "nikto", "text": "Nikto scanning http://translate.google.be"}
+{"ts": "2025-12-11T12:20:08.110161+00:00", "source": "nikto", "text": "Nikto scanning http://ww.google.be"}
+{"ts": "2025-12-11T12:20:08.158772+00:00", "source": "nikto", "text": "Nikto scanning http://www.google.be"}
+{"ts": "2025-12-11T12:20:08.252965+00:00", "source": "nikto", "text": "Nikto scanned 14 hosts."}
+{"ts": "2025-12-11T12:20:08.297953+00:00", "source": "nikto", "text": "[nikto] Nikto scan finished."}
+{"ts": "2025-12-11T12:20:25.666083+00:00", "source": "COMPLETED", "text": "Recon finished successfully."}
+{"ts": "2025-12-12T14:31:26.718917+00:00", "source": "scheduler", "text": "Job dispatched to worker."}
+{"ts": "2025-12-12T14:31:26.718466+00:00", "source": "RUNNING", "text": "Recon started."}
+{"ts": "2025-12-12T14:31:26.726020+00:00", "source": "amass", "text": "[amass] Amass already completed."}
+{"ts": "2025-12-12T14:31:26.726606+00:00", "source": "subfinder", "text": "[subfinder] Subfinder already completed."}
+{"ts": "2025-12-12T14:31:26.740878+00:00", "source": "assetfinder", "text": "[assetfinder] Assetfinder already completed."}
+{"ts": "2025-12-12T14:31:26.741435+00:00", "source": "findomain", "text": "[findomain] Findomain already completed."}
+{"ts": "2025-12-12T14:31:26.747902+00:00", "source": "subfinder", "text": "subfinder added 14 new subdomains."}
+{"ts": "2025-12-12T14:31:26.748058+00:00", "source": "sublist3r", "text": "[sublist3r] Sublist3r already completed."}
+{"ts": "2025-12-12T14:31:26.865445+00:00", "source": "ffuf", "text": "[ffuf] Wordlist missing; ffuf skipped."}
+{"ts": "2025-12-12T14:31:26.870305+00:00", "source": "httpx", "text": "[httpx] httpx scanning 14 new hosts"}
+{"ts": "2025-12-12T14:31:27.091302+00:00", "source": "httpx", "text": "$ /Users/wesleythijs/go/bin/httpx -l recon_data/subs_google.be_httpx_batch.txt -json -o recon_data/httpx_google.be.json -timeout 10 -follow-redirects -v"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:27.992349+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://consent.google.be\",\"input\":\"consent.google.be\",\"title\":\"Error 404 (Niet gevonden)!!1\",\"scheme\":\"https\",\"webserver\":\"ESF\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"consent.google.be\",\"host_ip\":\"2a00:1450:400c:c02::66\",\"path\":\"/\",\"time\":\"151.530583ms\",\"a\":[\"142.250.110.101\",\"142.250.110.100\",\"142.250.110.138\",\"142.250.110.102\",\"142.250.110.139\",\"142.250.110.113\"],\"aaaa\":[\"2a00:1"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.014589+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://id.google.be\",\"input\":\"id.google.be\",\"title\":\"Error 404 (Not Found)!!1\",\"scheme\":\"https\",\"webserver\":\"scaffolding on HTTPServer2\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"id.google.be\",\"host_ip\":\"74.125.206.94\",\"path\":\"/\",\"time\":\"174.369459ms\",\"a\":[\"74.125.206.94\"],\"aaaa\":[\"2a00:1450:400c:c0a::5e\"],\"tech\":[\"HTTP/3\"],\"words\":83,\"lines\":11,\"status_code\":404,\"content_length\":156"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.11211+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://clients6.google.be\",\"input\":\"clients6.google.be\",\"title\":\"Error 404 (Not Found)!!1\",\"scheme\":\"https\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"clients6.google.be\",\"host_ip\":\"142.250.110.101\",\"path\":\"/\",\"time\":\"272.697208ms\",\"a\":[\"142.250.110.101\",\"142.250.110.138\",\"142.250.110.139\",\"142.250.110.102\",\"142.250.110.113\",\"142.250.110.100\"],\"aaaa\":[\"2a00:1450:400c:c0d::66\",\"2a00:145"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.228043+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://shopping.google.be\",\"input\":\"shopping.google.be\",\"title\":\"Update je browser om door te gaan\",\"scheme\":\"https\",\"webserver\":\"gws\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"shopping.google.be\",\"host_ip\":\"64.233.184.92\",\"path\":\"/\",\"final_url\":\"https://www.google.be/shopping\",\"time\":\"271.747209ms\",\"chain_status_codes\":[301,200],\"a\":[\"64.233.184.92\"],\"aaaa\":[\"2a00:1450:400c:c06::5c\""}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.261355+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://adssettings.google.be\",\"input\":\"adssettings.google.be\",\"title\":\"Advertentievoorkeuren van Google\",\"scheme\":\"https\",\"webserver\":\"content-ads-prefmgr\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"adssettings.google.be\",\"host_ip\":\"74.125.206.138\",\"path\":\"/\",\"final_url\":\"https://www.google.be/ads/preferences/html/blocked-cookies.html\",\"time\":\"419.592833ms\",\"chain_status_codes\":[302,3"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.266782+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://www.google.be\",\"input\":\"www.google.be\",\"title\":\"Google\",\"scheme\":\"https\",\"webserver\":\"gws\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"www.google.be\",\"host_ip\":\"74.125.71.94\",\"path\":\"/\",\"final_url\":\"https://www.google.com/\",\"time\":\"313.414167ms\",\"chain_status_codes\":[301,200],\"a\":[\"74.125.71.94\"],\"aaaa\":[\"2a00:1450:400c:c0b::5e\"],\"tech\":[\"Google Web Server\",\"HTTP/3\"],\"words\":169"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.670118+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://privacy.google.be\",\"input\":\"privacy.google.be\",\"title\":\"Control Your Online Safety and Privacy - Google Safety Center\",\"scheme\":\"https\",\"webserver\":\"sffe\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"privacy.google.be\",\"host_ip\":\"74.125.133.139\",\"path\":\"/\",\"final_url\":\"https://safety.google/\",\"time\":\"337.494625ms\",\"chain_status_codes\":[301,200],\"a\":[\"74.125.133.139\",\"74.125.133.1"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.738937+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://ampcid.google.be\",\"input\":\"ampcid.google.be\",\"title\":\"Google\",\"scheme\":\"https\",\"webserver\":\"gws\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"ampcid.google.be\",\"host_ip\":\"64.233.167.101\",\"path\":\"/\",\"final_url\":\"https://www.google.com/\",\"time\":\"369.24875ms\",\"chain_status_codes\":[302,200],\"a\":[\"64.233.167.102\",\"64.233.167.139\",\"64.233.167.100\",\"64.233.167.113\",\"64.233.167.138\",\"64."}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.755947+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://ww.google.be\",\"input\":\"ww.google.be\",\"title\":\"Google\",\"scheme\":\"https\",\"webserver\":\"gws\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"ww.google.be\",\"host_ip\":\"108.177.15.94\",\"path\":\"/\",\"final_url\":\"https://www.google.com/\",\"time\":\"369.99975ms\",\"chain_status_codes\":[302,200],\"a\":[\"108.177.15.94\"],\"aaaa\":[\"2a00:1450:400c:c0d::5e\"],\"tech\":[\"Google Web Server\",\"HSTS\",\"HTTP/3\"],\"words"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:28.763926+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://cse.google.be\",\"input\":\"cse.google.be\",\"title\":\"Programmable Search Engine by Google\",\"scheme\":\"https\",\"webserver\":\"sffe\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"cse.google.be\",\"host_ip\":\"64.233.167.138\",\"path\":\"/\",\"final_url\":\"https://programmablesearchengine.google.com/about/\",\"time\":\"823.343834ms\",\"chain_status_codes\":[302,200],\"a\":[\"64.233.167.113\",\"64.233.167.138\",\"64.2"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:29.547201+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://adwords.google.be\",\"input\":\"adwords.google.be\",\"title\":\"Google Ads - Zorg voor meer klanten en verkoop via online advertenties\",\"scheme\":\"https\",\"webserver\":\"ESF\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"adwords.google.be\",\"host_ip\":\"74.125.71.101\",\"path\":\"/\",\"final_url\":\"https://business.google.com/nl/google-ads/?ucbcb=1\",\"time\":\"807.944458ms\",\"chain_status_codes\":[302,302,3"}
+{"ts": "2025-12-12T14:31:36.491025+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-12T15:31:36.477985+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://translate.google.be\",\"input\":\"translate.google.be\",\"title\":\"Google Translate\",\"scheme\":\"https\",\"webserver\":\"ESF\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"translate.google.be\",\"host_ip\":\"74.125.71.94\",\"path\":\"/\",\"final_url\":\"https://translate.google.be/?ucbcb=1\",\"time\":\"712.635083ms\",\"chain_status_codes\":[302,303,200],\"a\":[\"74.125.71.94\"],\"aaaa\":[\"2a00:1450:400c:c0b::5e\"],\"tec"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "    __    __  __       _  __"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "   / /_  / /_/ /_____ | |/ /"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "  / __ \\/ __/ __/ __ \\|   /"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": " / / / / /_/ /_/ /_/ /   |"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "/_/ /_/\\__/\\__/ .___/_/|_|"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "             /_/"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "\t\tprojectdiscovery.io"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "[\u001b[34mINF\u001b[0m] Current httpx version v1.7.4 (\u001b[92mlatest\u001b[0m)"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "[\u001b[93mWRN\u001b[0m] UI Dashboard is disabled, Use -dashboard option to enable"}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "[\u001b[35mDBG\u001b[0m] Failed 'http://sandbox.google.be': Get \"http://sandbox.google.be\": cause=\"no address found for host\""}
+{"ts": "2025-12-12T14:31:36.492231+00:00", "source": "HTTPX stderr", "text": "[\u001b[35mDBG\u001b[0m] Failed 'http://cctldtest.google.be': Get \"http://cctldtest.google.be\": cause=\"no address found for host\""}
+{"ts": "2025-12-12T14:31:36.534694+00:00", "source": "httpx", "text": "httpx scanned 14 hosts."}
+{"ts": "2025-12-12T14:31:36.610193+00:00", "source": "httpx", "text": "[httpx] httpx scan finished."}
+{"ts": "2025-12-12T14:31:36.616380+00:00", "source": "nuclei", "text": "[nuclei] nuclei scanning 14 new hosts"}
+{"ts": "2025-12-12T14:31:36.616636+00:00", "source": "scheduler", "text": "Waiting for nuclei slot..."}
+{"ts": "2025-12-12T14:31:36.616689+00:00", "source": "scheduler", "text": "nuclei slot acquired."}
+{"ts": "2025-12-12T14:31:36.812664+00:00", "source": "nuclei", "text": "$ /opt/homebrew/bin/nuclei -l recon_data/subs_google.be_nuclei_batch.txt -jsonl"}

@@ -1,25 +1,3361 @@
 {
-  "last_updated": "2025-12-07T19:21:54.839631+00:00",
+  "last_updated": "2025-12-12T14:32:21.215277+00:00",
   "targets": {
     "dracoon.app": {
       "flags": {
-        "amass_done": false,
+        "amass_done": true,
+        "assetfinder_done": true,
         "ffuf_done": false,
+        "findomain_done": true,
         "httpx_done": true,
         "nikto_done": true,
-        "nuclei_done": true
+        "nuclei_done": true,
+        "subfinder_done": true,
+        "sublist3r_done": true
       },
-      "subdomains": {}
+      "subdomains": {
+        "alpha-paypay.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://alpha-paypay.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "alpha-paypay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "alpha-paypay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://alpha-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "alpha-paypay.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "alpha-paypay.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "alpha-paypay.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "alpha-paypay.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "alpha-paypay.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "askoshelievatodandomain-vendorerfig-lab.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "askoshelievatodandomain-vendorerfig-lab.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "askoshelievatodandomain-vendorerfig-lab.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "askoshelievatodandomain-vendorerfig-lab.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "askoshelievatodandomain-vendorerfig-lab.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "askoshelievatodandomain-vendorerfig-lab.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "askoshelievatodandomain-vendorerfig-lab.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "askoshelievatodandomain-vendorerfig-lab.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "bounty-cloud.dracoon.app": {
+          "httpx": {
+            "content_length": 2265,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://bounty-cloud.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://bounty-cloud.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "bounty-cloud.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "bounty-cloud.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://bounty-cloud.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://bounty-cloud.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-cloud.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-cloud.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-cloud.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "bounty-cloud.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "bounty-cloud.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "bounty-cloud.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "bounty-cloud.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "bounty-server.dracoon.app": {
+          "httpx": {
+            "content_length": 2712,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://bounty-server.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "bounty-server.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "bounty-server.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app/error",
+              "name": "Java Spring Detection",
+              "severity": "info",
+              "template_id": "spring-detect"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "Allowed Options Method",
+              "severity": "info",
+              "template_id": "options-method"
+            },
+            {
+              "matched_at": "https://bounty-server.dracoon.app",
+              "name": "Missing Cookie SameSite Strict",
+              "severity": "info",
+              "template_id": "missing-cookie-samesite-strict"
+            },
+            {
+              "matched_at": "bounty-server.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "bounty-server.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "bounty-server.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "bounty-server.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            },
+            {
+              "matched_at": "bounty-server.dracoon.app",
+              "name": "DNS SaaS Service Detection",
+              "severity": "info",
+              "template_id": "dns-saas-service-detection"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "dracoon.app",
+              "name": "NS Record Detection",
+              "severity": "info",
+              "template_id": "nameserver-fingerprint"
+            },
+            {
+              "matched_at": "dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "fls.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://fls.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "fls.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "fls.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://fls.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "fls.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "fls.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "fls.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "fls.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "fls.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "gftaddondomain.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://gftaddondomain.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "gftaddondomain.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "gftaddondomain.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "gftaddondomain.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "gftaddondomain.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "gftaddondomain.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "gftaddondomain.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "gftaddondomain.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "gifhorn.dracoon.app": {
+          "httpx": {
+            "content_length": 2262,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://gifhorn.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://gifhorn.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "gifhorn.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "gifhorn.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://gifhorn.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://gifhorn.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gifhorn.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gifhorn.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gifhorn.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "gifhorn.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "gifhorn.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "gifhorn.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "gifhorn.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "gqh.dracoon.app": {
+          "httpx": {
+            "content_length": 2265,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://gqh.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://gqh.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "gqh.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "gqh.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://gqh.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://gqh.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gqh.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gqh.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://gqh.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "hauff-technik.dracoon.app": {
+          "httpx": {
+            "content_length": 2265,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://hauff-technik.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://hauff-technik.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "hauff-technik.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "hauff-technik.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://hauff-technik.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://hauff-technik.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://hauff-technik.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://hauff-technik.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://hauff-technik.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "hauff-technik.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "hauff-technik.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "hauff-technik.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "hauff-technik.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "helbig-datenschutz.dracoon.app": {
+          "httpx": {
+            "content_length": 2265,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://helbig-datenschutz.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://helbig-datenschutz.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "helbig-datenschutz.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "helbig-datenschutz.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://helbig-datenschutz.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://helbig-datenschutz.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://helbig-datenschutz.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://helbig-datenschutz.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://helbig-datenschutz.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "helbig-datenschutz.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "helbig-datenschutz.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "helbig-datenschutz.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "helbig-datenschutz.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "paypay-help.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://paypay-help.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "paypay-help.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "paypay-help.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-help.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "paypay-help.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "paypay-help.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "paypay-help.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "paypay-help.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "paypay-help.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "paypay-now.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://paypay-now.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "paypay-now.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "paypay-now.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay-now.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "paypay-now.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "paypay-now.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "paypay-now.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "paypay-now.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "paypay-now.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "paypay.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://paypay.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "paypay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "paypay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "paypay.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "paypay.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "paypay.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "paypay.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "paypay.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "paypayer-alipay.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://paypayer-alipay.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "paypayer-alipay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "paypayer-alipay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-alipay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "paypayer-alipay.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "paypayer-alipay.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "paypayer-alipay.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "paypayer-alipay.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "paypayer-alipay.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "paypayer-chinabank.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://paypayer-chinabank.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "paypayer-chinabank.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "paypayer-chinabank.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypayer-chinabank.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "paypayer-chinabank.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "paypayer-chinabank.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "paypayer-chinabank.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "paypayer-chinabank.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "paypayer-chinabank.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "paypaymini.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://paypaymini.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "paypaymini.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "paypaymini.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://paypaymini.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "paypaymini.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "paypaymini.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "paypaymini.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "paypaymini.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "paypaymini.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "pilipaypayresult.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://pilipaypayresult.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "pilipaypayresult.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "pilipaypayresult.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://pilipaypayresult.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "pilipaypayresult.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "pilipaypayresult.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "pilipaypayresult.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "pilipaypayresult.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "pilipaypayresult.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "prodsecurity.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://prodsecurity.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "prodsecurity.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "prodsecurity.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsecurity.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "prodsecurity.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "prodsecurity.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "prodsecurity.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "prodsecurity.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "prodsecurity.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "prodsimplycomputermerchantsaccess.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "prodsimplycomputermerchantsaccess.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "prodsimplycomputermerchantsaccess.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "prodsimplycomputermerchantsaccess.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "prodsimplycomputermerchantsaccess.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "prodsimplycomputermerchantsaccess.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "prodsimplycomputermerchantsaccess.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "prodsimplycomputermerchantsaccess.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "stadtverwaltung-kehl.dracoon.app": {
+          "httpx": {
+            "content_length": 2262,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://stadtverwaltung-kehl.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://stadtverwaltung-kehl.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "stadtverwaltung-kehl.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "stadtverwaltung-kehl.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://stadtverwaltung-kehl.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://stadtverwaltung-kehl.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stadtverwaltung-kehl.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stadtverwaltung-kehl.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stadtverwaltung-kehl.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "stadtverwaltung-kehl.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "stadtverwaltung-kehl.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "stadtverwaltung-kehl.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "stadtverwaltung-kehl.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "stg-billioon-paypay.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://stg-billioon-paypay.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "stg-billioon-paypay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "stg-billioon-paypay.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://stg-billioon-paypay.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "stg-billioon-paypay.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "stg-billioon-paypay.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "stg-billioon-paypay.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "stg-billioon-paypay.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "stg-billioon-paypay.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "tcb.dracoon.app": {
+          "httpx": {
+            "content_length": 2265,
+            "status_code": 200,
+            "tech": [
+              "HSTS"
+            ],
+            "title": null,
+            "url": "https://tcb.dracoon.app",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://tcb.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "tcb.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "tcb.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://tcb.dracoon.app",
+              "name": "XSS-Protection Header - Cross-Site Scripting",
+              "severity": "info",
+              "template_id": "xss-deprecated-header"
+            },
+            {
+              "matched_at": "https://tcb.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://tcb.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://tcb.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://tcb.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "tcb.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "tcb.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "tcb.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "tcb.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "www.gftaddondomain.dracoon.app": {
+          "httpx": {
+            "content_length": 265545,
+            "status_code": 200,
+            "tech": [
+              "Cloudflare",
+              "Cloudflare Bot Management",
+              "Cookiebot",
+              "Envoy",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3",
+              "HubSpot",
+              "HubSpot CMS Hub",
+              "ZURB Foundation",
+              "cdnjs",
+              "jQuery:1.7.1"
+            ],
+            "title": "DRACOON \u2013 Hochsichere Zero-Trust-Cloud f\u00fcr Unternehmen",
+            "url": "https://www.gftaddondomain.dracoon.app",
+            "webserver": "cloudflare"
+          },
+          "nikto": [],
+          "nuclei": [
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "External Service Interaction",
+              "severity": "info",
+              "template_id": "external-service-interaction"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Missing Subresource Integrity",
+              "severity": "info",
+              "template_id": "missing-sri"
+            },
+            {
+              "matched_at": "www.gftaddondomain.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "www.gftaddondomain.dracoon.app:443",
+              "name": "TLS Version - Detect",
+              "severity": "info",
+              "template_id": "tls-version"
+            },
+            {
+              "matched_at": "https://www.dracoon.com/de/home",
+              "name": "Form Detection",
+              "severity": "info",
+              "template_id": "form-detection"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "https://www.gftaddondomain.dracoon.app",
+              "name": "HTTP Missing Security Headers",
+              "severity": "info",
+              "template_id": "http-missing-security-headers"
+            },
+            {
+              "matched_at": "www.gftaddondomain.dracoon.app:443",
+              "name": "Detect SSL Certificate Issuer",
+              "severity": "info",
+              "template_id": "ssl-issuer"
+            },
+            {
+              "matched_at": "www.gftaddondomain.dracoon.app:443",
+              "name": "Mismatched SSL Certificate",
+              "severity": "info",
+              "template_id": "mismatched-ssl-certificate"
+            },
+            {
+              "matched_at": "www.gftaddondomain.dracoon.app:443",
+              "name": "SSL DNS Names",
+              "severity": "info",
+              "template_id": "ssl-dns-names"
+            },
+            {
+              "matched_at": "www.gftaddondomain.dracoon.app:443",
+              "name": "Wildcard TLS Certificate",
+              "severity": "info",
+              "template_id": "wildcard-tls"
+            },
+            {
+              "matched_at": "www.gftaddondomain.dracoon.app",
+              "name": "CAA Record",
+              "severity": "info",
+              "template_id": "caa-fingerprint"
+            }
+          ],
+          "sources": [
+            "assetfinder"
+          ]
+        }
+      }
     },
     "google.be": {
       "flags": {
         "amass_done": true,
         "assetfinder_done": true,
         "ffuf_done": false,
+        "findomain_done": true,
         "httpx_done": true,
         "nikto_done": true,
         "nuclei_done": true,
-        "subfinder_done": true
+        "subfinder_done": true,
+        "sublist3r_done": true
       },
       "subdomains": {
         "adssettings.google.be": {
@@ -46433,6 +49769,1475 @@
           "nuclei": [],
           "sources": [
             "subfinder"
+          ]
+        }
+      }
+    },
+    "google.it": {
+      "flags": {
+        "amass_done": false,
+        "assetfinder_done": false,
+        "ffuf_done": false,
+        "findomain_done": false,
+        "httpx_done": false,
+        "nikto_done": false,
+        "nuclei_done": false,
+        "subfinder_done": false,
+        "sublist3r_done": false
+      },
+      "subdomains": {
+        "accounts.google.it": {
+          "httpx": {
+            "content_length": 1202002,
+            "status_code": 200,
+            "tech": [
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Sign in - Google Accounts",
+            "url": "https://accounts.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "adssettings.google.it": {
+          "httpx": {
+            "content_length": 1417,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Preferenze annunci Google",
+            "url": "https://adssettings.google.it",
+            "webserver": "content-ads-prefmgr"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "adwords.google.it": {
+          "httpx": {
+            "content_length": 343848,
+            "status_code": 200,
+            "tech": [
+              "Bootstrap",
+              "HSTS",
+              "HTTP/3",
+              "Material Design Lite",
+              "reCAPTCHA"
+            ],
+            "title": "Google Ads - Zorg voor meer klanten en verkoop via online advertenties",
+            "url": "https://adwords.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "ampcid.google.it": {
+          "httpx": {
+            "content_length": 235935,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://ampcid.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "apps.google.it": {
+          "httpx": {
+            "content_length": 608002,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "App Aziendali e Strumenti di Produttivit\u00e0 | Google Workspace",
+            "url": "https://apps.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "archive.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://archive.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "assistant.google.it": {
+          "httpx": {
+            "content_length": 296269,
+            "status_code": 200,
+            "tech": [
+              "Google Analytics",
+              "Google Hosted Libraries",
+              "Google Tag Manager",
+              "HTTP/3",
+              "Hammer.js"
+            ],
+            "title": "Google Assistant, your own personal Google",
+            "url": "https://assistant.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "books.google.it": {
+          "httpx": {
+            "content_length": 1103,
+            "status_code": 403,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Sorry...",
+            "url": "https://books.google.it",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "cctldtest.google.it": {
+          "httpx": null,
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "clients6.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://clients6.google.it",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "consent.google.it": {
+          "httpx": {
+            "content_length": 1666,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Non trovato)!!1",
+            "url": "https://consent.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "cse.google.it": {
+          "httpx": {
+            "content_length": 25659,
+            "status_code": 200,
+            "tech": [
+              "Google Analytics",
+              "Google Hosted Libraries",
+              "HTTP/3"
+            ],
+            "title": "Programmable Search Engine by Google",
+            "url": "https://cse.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "directory.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://directory.google.it",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "events.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://events.google.it",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "get.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://get.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "google.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://google.google.it",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "google.it": {
+          "httpx": {
+            "content_length": 235955,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "groups.google.it": {
+          "httpx": {
+            "content_length": 1666,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Non trovato)!!1",
+            "url": "https://groups.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "id.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://id.google.it",
+            "webserver": "scaffolding on HTTPServer2"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "image.google.it": {
+          "httpx": {
+            "content_length": 266392,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Afbeeldingen",
+            "url": "https://image.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "images.google.it": {
+          "httpx": {
+            "content_length": 267026,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Afbeeldingen",
+            "url": "https://images.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "just.google.it": {
+          "httpx": null,
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "labs.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://labs.google.it",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "local.google.it": {
+          "httpx": {
+            "content_length": 208081,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Maps",
+            "url": "https://local.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "m.google.it": {
+          "httpx": {
+            "content_length": 648945,
+            "status_code": 200,
+            "tech": [
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google's products and services  - About Google",
+            "url": "https://m.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "map.google.it": {
+          "httpx": {
+            "content_length": 271821,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://map.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "maps.google.it": {
+          "httpx": {
+            "content_length": 159432,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Maps",
+            "url": "https://maps.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "mobile.google.it": {
+          "httpx": {
+            "content_length": 648945,
+            "status_code": 200,
+            "tech": [
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google's products and services  - About Google",
+            "url": "https://mobile.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "news.google.it": {
+          "httpx": {
+            "content_length": 1596181,
+            "status_code": 200,
+            "tech": [
+              "Google Analytics",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google News",
+            "url": "https://news.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "payments.google.it": {
+          "httpx": {
+            "content_length": 5622,
+            "status_code": 200,
+            "tech": [
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Redirecting...",
+            "url": "https://payments.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "photo.google.it": {
+          "httpx": {
+            "content_length": 3045,
+            "status_code": 200,
+            "tech": [
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Browser no longer supported",
+            "url": "https://photo.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "photos.google.it": {
+          "httpx": {
+            "content_length": 126046,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "2025 Google Photos Recap: Organize, Edit, & Backup Memories",
+            "url": "https://photos.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "privacy.google.it": {
+          "httpx": {
+            "content_length": 185525,
+            "status_code": 200,
+            "tech": [
+              "Google Tag Manager",
+              "HTTP/3"
+            ],
+            "title": "Control Your Online Safety and Privacy - Google Safety Center",
+            "url": "https://privacy.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "sandbox.google.it": {
+          "httpx": null,
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "shopping.google.it": {
+          "httpx": {
+            "content_length": 103317,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Update je browser om door te gaan",
+            "url": "https://shopping.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "store.google.it": {
+          "httpx": {
+            "content_length": 1436346,
+            "status_code": 200,
+            "tech": [
+              "Google Analytics",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google Store ufficiale per dispositivi e accessori Google",
+            "url": "https://store.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "translate.google.it": {
+          "httpx": {
+            "content_length": 3021320,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Google Traduttore",
+            "url": "https://translate.google.it",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "video.google.it": {
+          "httpx": {
+            "content_length": 235065,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google Video's",
+            "url": "https://video.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "w.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://w.google.it",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "work.google.it": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://work.google.it",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "ww.google.it": {
+          "httpx": {
+            "content_length": 252025,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://ww.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "www.google.it": {
+          "httpx": {
+            "content_length": 239091,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://www.google.it",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        }
+      }
+    },
+    "google.nl": {
+      "flags": {
+        "amass_done": false,
+        "assetfinder_done": false,
+        "ffuf_done": false,
+        "findomain_done": false,
+        "httpx_done": false,
+        "nikto_done": false,
+        "nuclei_done": false,
+        "subfinder_done": false,
+        "sublist3r_done": false
+      },
+      "subdomains": {
+        "accounts.google.nl": {
+          "httpx": {
+            "content_length": 848756,
+            "status_code": 200,
+            "tech": [
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Sign in - Google Accounts",
+            "url": "https://accounts.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "adssettings.google.nl": {
+          "httpx": {
+            "content_length": 1413,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Advertentievoorkeuren van Google",
+            "url": "https://adssettings.google.nl",
+            "webserver": "content-ads-prefmgr"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "adwords.google.nl": {
+          "httpx": {
+            "content_length": 343848,
+            "status_code": 200,
+            "tech": [
+              "Bootstrap",
+              "HSTS",
+              "HTTP/3",
+              "Material Design Lite",
+              "reCAPTCHA"
+            ],
+            "title": "Google Ads - Zorg voor meer klanten en verkoop via online advertenties",
+            "url": "https://adwords.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "ampcid.google.nl": {
+          "httpx": {
+            "content_length": 271910,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://ampcid.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "apps.google.nl": {
+          "httpx": {
+            "content_length": 606598,
+            "status_code": 200,
+            "tech": [
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Zakelijke apps & samenwerkingstools | Google Workspace",
+            "url": "https://apps.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "archive.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://archive.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "books.google.nl": {
+          "httpx": {
+            "content_length": 1103,
+            "status_code": 403,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Sorry...",
+            "url": "https://books.google.nl",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "cctldtest.google.nl": {
+          "httpx": null,
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "clients6.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://clients6.google.nl",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "consent.google.nl": {
+          "httpx": {
+            "content_length": 1663,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Niet gevonden)!!1",
+            "url": "https://consent.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "cse.google.nl": {
+          "httpx": {
+            "content_length": 25659,
+            "status_code": 200,
+            "tech": [
+              "Google Analytics",
+              "Google Hosted Libraries",
+              "HTTP/3"
+            ],
+            "title": "Programmable Search Engine by Google",
+            "url": "https://cse.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "directory.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://directory.google.nl",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "events.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://events.google.nl",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "google.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://google.google.nl",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "google.nl": {
+          "httpx": {
+            "content_length": 240571,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "assetfinder"
+          ]
+        },
+        "groups.google.nl": {
+          "httpx": {
+            "content_length": 1656,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Niet gevonden)!!1",
+            "url": "https://groups.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "id.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://id.google.nl",
+            "webserver": "scaffolding on HTTPServer2"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "image.google.nl": {
+          "httpx": {
+            "content_length": 252274,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Afbeeldingen",
+            "url": "https://image.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "images.google.nl": {
+          "httpx": {
+            "content_length": 270614,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Afbeeldingen",
+            "url": "https://images.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "labs.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://labs.google.nl",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "local.google.nl": {
+          "httpx": {
+            "content_length": 160811,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Maps",
+            "url": "https://local.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "m.google.nl": {
+          "httpx": {
+            "content_length": 648945,
+            "status_code": 200,
+            "tech": [
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google's products and services  - About Google",
+            "url": "https://m.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "map.google.nl": {
+          "httpx": {
+            "content_length": 271903,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://map.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "maps.google.nl": {
+          "httpx": {
+            "content_length": 160041,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HTTP/3"
+            ],
+            "title": "Google Maps",
+            "url": "https://maps.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "mobile.google.nl": {
+          "httpx": {
+            "content_length": 648945,
+            "status_code": 200,
+            "tech": [
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google's products and services  - About Google",
+            "url": "https://mobile.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "news.google.nl": {
+          "httpx": {
+            "content_length": 1611100,
+            "status_code": 200,
+            "tech": [
+              "Google Analytics",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google Nieuws",
+            "url": "https://news.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "payments.google.nl": {
+          "httpx": {
+            "content_length": 5622,
+            "status_code": 200,
+            "tech": [
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Redirecting...",
+            "url": "https://payments.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "photo.google.nl": {
+          "httpx": {
+            "content_length": 126046,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "2025 Google Photos Recap: Organize, Edit, & Backup Memories",
+            "url": "https://photo.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "photos.google.nl": {
+          "httpx": {
+            "content_length": 126046,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "2025 Google Photos Recap: Organize, Edit, & Backup Memories",
+            "url": "https://photos.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "privacy.google.nl": {
+          "httpx": {
+            "content_length": 185525,
+            "status_code": 200,
+            "tech": [
+              "Google Tag Manager",
+              "HTTP/3"
+            ],
+            "title": "Control Your Online Safety and Privacy - Google Safety Center",
+            "url": "https://privacy.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "sandbox.google.nl": {
+          "httpx": null,
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "shopping.google.nl": {
+          "httpx": {
+            "content_length": 253792,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google Shopping",
+            "url": "https://shopping.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "store.google.nl": {
+          "httpx": {
+            "content_length": 1393653,
+            "status_code": 200,
+            "tech": [
+              "Google Analytics",
+              "Google Tag Manager",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google Store voor Google-apparaten en -accessoires",
+            "url": "https://store.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "translate.google.nl": {
+          "httpx": {
+            "content_length": 3032461,
+            "status_code": 200,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Google Translate",
+            "url": "https://translate.google.nl",
+            "webserver": "ESF"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "video.google.nl": {
+          "httpx": {
+            "content_length": 235012,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google Video's",
+            "url": "https://video.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "w.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://w.google.nl",
+            "webserver": null
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "work.google.nl": {
+          "httpx": {
+            "content_length": 1561,
+            "status_code": 404,
+            "tech": [
+              "HTTP/3"
+            ],
+            "title": "Error 404 (Not Found)!!1",
+            "url": "https://work.google.nl",
+            "webserver": "sffe"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder"
+          ]
+        },
+        "ww.google.nl": {
+          "httpx": {
+            "content_length": 268824,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://ww.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
+          ]
+        },
+        "www.google.nl": {
+          "httpx": {
+            "content_length": 232620,
+            "status_code": 200,
+            "tech": [
+              "Google Web Server",
+              "HSTS",
+              "HTTP/3"
+            ],
+            "title": "Google",
+            "url": "https://www.google.nl",
+            "webserver": "gws"
+          },
+          "nikto": [],
+          "nuclei": [],
+          "sources": [
+            "subfinder",
+            "assetfinder"
           ]
         }
       }

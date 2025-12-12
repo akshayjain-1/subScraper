@@ -20,6 +20,7 @@ import csv
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -398,15 +399,100 @@ def save_state(state: Dict[str, Any]) -> None:
         log(f"Error refreshing dashboard HTML: {e}")
 
 
+def _candidate_tool_paths(exe: str) -> List[str]:
+    """
+    Return a de-duplicated list of candidate paths for a tool, checking PATH and common Go bin dirs.
+    """
+    candidates: List[str] = []
+    exe_path = Path(exe)
+    if exe_path.is_absolute():
+        candidates.append(str(exe_path))
+    else:
+        found = shutil.which(exe)
+        if found:
+            candidates.append(found)
+    gobin = os.environ.get("GOBIN")
+    if gobin:
+        candidates.append(str(Path(gobin) / exe))
+    gopath = os.environ.get("GOPATH")
+    if gopath:
+        candidates.append(str(Path(gopath) / "bin" / exe))
+    candidates.append(str(Path.home() / "go" / "bin" / exe))
+    seen = set()
+    ordered: List[str] = []
+    for cand in candidates:
+        if not cand:
+            continue
+        if cand in seen:
+            continue
+        seen.add(cand)
+        ordered.append(cand)
+    return ordered
+
+
+def _validate_tool_binary(tool: str, path_str: str) -> bool:
+    """
+    Ensure we are invoking the intended binary.
+    This is mainly to avoid grabbing the Python 'httpx' CLI instead of ProjectDiscovery's tool.
+    """
+    if not path_str:
+        return False
+    path = Path(path_str)
+    if not path.exists():
+        return False
+    if tool not in {"httpx", "nuclei"}:
+        return True
+    try:
+        result = subprocess.run(
+            [str(path), "-version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return False
+    output = (result.stdout or "") + (result.stderr or "")
+    output_lower = output.lower()
+    if tool == "httpx":
+        if "projectdiscovery" in output_lower or "httpx version" in output_lower:
+            return True
+        if "httpx command line client" in output_lower:
+            return False
+    elif tool == "nuclei":
+        if "nuclei engine version" in output_lower or "projectdiscovery" in output_lower:
+            return True
+    return False
+
+
+def _resolve_tool_path(tool: str) -> Optional[str]:
+    exe = TOOLS[tool]
+    candidates = _candidate_tool_paths(exe)
+    for cand in candidates:
+        if not cand:
+            continue
+        path = Path(cand)
+        if not path.exists():
+            continue
+        if _validate_tool_binary(tool, cand):
+            return cand
+        else:
+            log(f"Found {tool} at {cand} but it does not look like the expected binary. Ignoring.")
+    return None
+
+
 def ensure_tool_installed(tool: str) -> bool:
     """
     Best-effort install using apt, then brew, then go install (for some tools).
     Returns True if tool is available after this, False otherwise.
     """
-    exe = TOOLS[tool]
-    if shutil.which(exe):
+    resolved = _resolve_tool_path(tool)
+    if resolved:
+        TOOLS[tool] = resolved
         log(f"{tool} already installed.")
         return True
+
+    exe = TOOLS[tool]
 
     log(f"{tool} not found. Attempting to install (best effort).")
 
@@ -424,7 +510,9 @@ def ensure_tool_installed(tool: str) -> bool:
                 ["sudo", "apt-get", "install", "-y", exe],
                 check=False,
             )
-            if shutil.which(exe):
+            resolved = _resolve_tool_path(tool)
+            if resolved:
+                TOOLS[tool] = resolved
                 log(f"{tool} installed via apt-get.")
                 return True
     except Exception as e:
@@ -438,7 +526,9 @@ def ensure_tool_installed(tool: str) -> bool:
                 ["brew", "install", exe],
                 check=False,
             )
-            if shutil.which(exe):
+            resolved = _resolve_tool_path(tool)
+            if resolved:
+                TOOLS[tool] = resolved
                 log(f"{tool} installed via brew.")
                 return True
     except Exception as e:
@@ -457,7 +547,9 @@ def ensure_tool_installed(tool: str) -> bool:
             pkg = go_pkgs[tool]
             log(f"Trying: go install {pkg}")
             subprocess.run(["go", "install", pkg], check=False)
-            if shutil.which(exe):
+            resolved = _resolve_tool_path(tool)
+            if resolved:
+                TOOLS[tool] = resolved
                 log(f"{tool} installed via go install.")
                 return True
     except Exception as e:
@@ -906,19 +998,20 @@ def run_downstream_pipeline(
         update_step("httpx", status="running", message=f"httpx scanning {len(new_hosts)} new hosts", progress=40)
         batch_file = write_subdomains_file(domain, new_hosts, suffix="_httpx_batch")
         httpx_json = httpx_scan(batch_file, domain, job_domain=job_domain)
-        enrich_state_with_httpx(state, domain, httpx_json)
-        httpx_processed.update(new_hosts)
-        save_state(state)
         try:
             batch_file.unlink()
         except FileNotFoundError:
             pass
         except Exception:
             pass
-        if httpx_json:
-            job_log_append(job_domain, f"httpx scanned {len(new_hosts)} hosts.", "httpx")
-        else:
+        if not httpx_json:
             job_log_append(job_domain, "httpx batch failed.", "httpx")
+            update_step("httpx", status="error", message="httpx batch failed. Check logs for details.", progress=100)
+            break
+        enrich_state_with_httpx(state, domain, httpx_json)
+        httpx_processed.update(new_hosts)
+        save_state(state)
+        job_log_append(job_domain, f"httpx scanned {len(new_hosts)} hosts.", "httpx")
 
     # ---------- nuclei ----------
     nuclei_processed: set = set()
@@ -945,19 +1038,20 @@ def run_downstream_pipeline(
             if job_domain:
                 job_log_append(job_domain, "nuclei slot acquired.", "scheduler")
             nuclei_json = nuclei_scan(batch_file, domain, job_domain=job_domain)
-        enrich_state_with_nuclei(state, domain, nuclei_json)
-        nuclei_processed.update(new_hosts)
-        save_state(state)
         try:
             batch_file.unlink()
         except FileNotFoundError:
             pass
         except Exception:
             pass
-        if nuclei_json:
-            job_log_append(job_domain, f"nuclei processed {len(new_hosts)} hosts.", "nuclei")
-        else:
+        if not nuclei_json:
             job_log_append(job_domain, "nuclei batch failed.", "nuclei")
+            update_step("nuclei", status="error", message="nuclei batch failed. Check logs for details.", progress=100)
+            break
+        enrich_state_with_nuclei(state, domain, nuclei_json)
+        nuclei_processed.update(new_hosts)
+        save_state(state)
+        job_log_append(job_domain, f"nuclei processed {len(new_hosts)} hosts.", "nuclei")
 
     state = load_state()
     flags = ensure_target_state(state, domain)["flags"]
@@ -990,13 +1084,14 @@ def run_downstream_pipeline(
                 if job_domain:
                     job_log_append(job_domain, "Nikto slot acquired.", "scheduler")
                 nikto_json = nikto_scan(new_hosts, domain, job_domain=job_domain)
+            if not nikto_json:
+                job_log_append(job_domain, "Nikto batch failed.", "nikto")
+                update_step("nikto", status="error", message="Nikto batch failed. Check logs for details.", progress=100)
+                break
             enrich_state_with_nikto(state, domain, nikto_json)
             nikto_processed.update(new_hosts)
             save_state(state)
-            if nikto_json:
-                job_log_append(job_domain, f"Nikto scanned {len(new_hosts)} hosts.", "nikto")
-            else:
-                job_log_append(job_domain, "Nikto batch failed.", "nikto")
+            job_log_append(job_domain, f"Nikto scanned {len(new_hosts)} hosts.", "nikto")
 
     log("Pipeline finished for this run.")
 
@@ -1076,12 +1171,39 @@ def nuclei_scan(subs_file: Path, domain: str, job_domain: Optional[str] = None) 
     cmd = [
         TOOLS["nuclei"],
         "-l", str(subs_file),
-        "-json",
-        "-o", str(out_json),
-        "-v",
+        "-jsonl",
     ]
-    success = run_subprocess(cmd, job_domain=job_domain, step="nuclei")
+    success = run_subprocess(cmd, outfile=out_json, job_domain=job_domain, step="nuclei")
     return out_json if success and out_json.exists() else None
+
+
+def _parse_nikto_output(host: str, stdout_text: str) -> List[Dict[str, Any]]:
+    findings: List[Dict[str, Any]] = []
+    if not stdout_text:
+        return findings
+    for raw_line in stdout_text.splitlines():
+        line = raw_line.strip()
+        if not line or not line.startswith("+"):
+            continue
+        # Skip summary lines (e.g. "+ 0 host(s) tested")
+        normalized = line.lstrip("+").strip()
+        if not normalized or normalized.lower().startswith("0 host"):
+            continue
+        finding: Dict[str, Any] = {
+            "host": host,
+            "msg": normalized,
+        }
+        osvdb_match = re.search(r"OSVDB-(\d+)", normalized, re.IGNORECASE)
+        if osvdb_match:
+            finding["osvdb"] = osvdb_match.group(1)
+        cve_match = re.search(r"CVE-\d{4}-\d+", normalized, re.IGNORECASE)
+        if cve_match:
+            finding["cve"] = cve_match.group(0).upper()
+        uri_match = re.search(r"(?:https?://[^\s]+)", normalized, re.IGNORECASE)
+        if uri_match:
+            finding["uri"] = uri_match.group(0)
+        findings.append(finding)
+    return findings
 
 
 def nikto_scan(subs: List[str], domain: str, job_domain: Optional[str] = None) -> Path:
@@ -1089,15 +1211,12 @@ def nikto_scan(subs: List[str], domain: str, job_domain: Optional[str] = None) -
         return None
     out_json = DATA_DIR / f"nikto_{domain}.json"
 
-    results = []
+    results: List[Dict[str, Any]] = []
     for host in subs:
         target = f"http://{host}"
         cmd = [
             TOOLS["nikto"],
             "-h", target,
-            "-Display", "V",
-            "-Format", "json",
-            "-output", "-",
         ]
         log(f"Running nikto against {target}")
         if job_domain:
@@ -1110,29 +1229,27 @@ def nikto_scan(subs: List[str], domain: str, job_domain: Optional[str] = None) -
                 text=True,
                 check=False,
             )
-            if proc.returncode != 0:
-                log(f"Nikto failed for {host}: {proc.stderr[:300]}")
-                if job_domain and proc.stderr:
-                    job_log_append(job_domain, proc.stderr, source="nikto stderr")
-                continue
-            # Nikto sometimes outputs multiple JSON objects; attempt to parse leniently
-            for line in proc.stdout.splitlines():
-                if job_domain:
-                    job_log_append(job_domain, line, source="nikto")
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                    results.append(obj)
-                except Exception:
-                    continue
         except FileNotFoundError:
             log("Nikto binary not found during run.")
-            break
+            return None
         except Exception as e:
             log(f"Nikto error for {host}: {e}")
+            if job_domain:
+                job_log_append(job_domain, f"Nikto error for {host}: {e}", source="nikto")
             continue
+
+        if job_domain and proc.stdout:
+            job_log_append(job_domain, proc.stdout, source="nikto")
+        if job_domain and proc.stderr:
+            job_log_append(job_domain, proc.stderr, source="nikto stderr")
+
+        if proc.returncode != 0:
+            log(f"Nikto failed for {host}: {proc.stderr[:300]}")
+            continue
+
+        host_findings = _parse_nikto_output(host, proc.stdout or "")
+        if host_findings:
+            results.extend(host_findings)
 
     try:
         with open(out_json, "w", encoding="utf-8") as f:
@@ -1283,13 +1400,15 @@ def enrich_state_with_nikto(state: Dict[str, Any], domain: str, nikto_json: Path
                 "nuclei": [],
                 "nikto": [],
             })
-            vulns = obj.get("vulnerabilities") or obj.get("vulns") or []
+            vulns = obj.get("vulnerabilities") or obj.get("vulns")
+            if not vulns:
+                vulns = [obj]
             normalized_vulns = []
             for v in vulns:
                 if isinstance(v, dict):
                     normalized_vulns.append({
                         "id": v.get("id"),
-                        "msg": v.get("msg") or v.get("description"),
+                        "msg": v.get("msg") or v.get("description") or v.get("message"),
                         "osvdb": v.get("osvdb"),
                         "risk": v.get("risk"),
                         "uri": v.get("uri"),
