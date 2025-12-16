@@ -90,3 +90,65 @@
 {"ts": "2025-12-16T15:11:26.455106+00:00", "source": "scheduler", "text": "Waiting for nuclei slot..."}
 {"ts": "2025-12-16T15:11:26.455215+00:00", "source": "scheduler", "text": "nuclei slot acquired."}
 {"ts": "2025-12-16T15:11:26.623845+00:00", "source": "nuclei", "text": "$ /opt/homebrew/bin/nuclei -l recon_data/subs_yahoo.nl_nuclei_batch.txt -jsonl"}
+{"ts": "2025-12-16T15:14:55.329732+00:00", "source": "nuclei", "text": "[\u001b[93mWRN\u001b[0m] Loading 2 unsigned templates for scan. Use with caution."}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "                     __     _"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "   ____  __  _______/ /__  (_)"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "  / __ \\/ / / / ___/ / _ \\/ /"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": " / / / / /_/ / /__/ /  __/ /"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "/_/ /_/\\__,_/\\___/_/\\___/_/   v3.5.1"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "\t\tprojectdiscovery.io"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[31mWRN\u001b[0m] Found 1 templates with runtime error (use -validate flag for further examination)"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Current nuclei version: v3.5.1 (\u001b[91moutdated\u001b[0m)"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Current nuclei-templates version: v10.3.5 (\u001b[92mlatest\u001b[0m)"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] New templates added in latest release: 57"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Templates loaded for current scan: 8911"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Executing 8909 signed templates from projectdiscovery/nuclei-templates"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Targets loaded for current scan: 1"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Running httpx on input host"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Found 1 URL from httpx"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Templates clustered: 1862 (Reduced 1749 Requests)"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Using Interactsh Server: oast.pro"}
+{"ts": "2025-12-16T15:14:55.330212+00:00", "source": "NUCLEI stderr", "text": "[\u001b[34mINF\u001b[0m] Scan completed in 3m. 0 matches found."}
+{"ts": "2025-12-16T15:14:55.541787+00:00", "source": "nuclei", "text": "nuclei processed 1 hosts."}
+{"ts": "2025-12-16T15:14:55.990618+00:00", "source": "nuclei", "text": "[nuclei] nuclei scan finished."}
+{"ts": "2025-12-16T15:14:56.037711+00:00", "source": "nikto", "text": "[nikto] Nikto scanning 1 pending hosts"}
+{"ts": "2025-12-16T15:14:56.037927+00:00", "source": "scheduler", "text": "Waiting for Nikto slot..."}
+{"ts": "2025-12-16T15:14:56.037998+00:00", "source": "scheduler", "text": "Nikto slot acquired."}
+{"ts": "2025-12-16T15:14:56.038163+00:00", "source": "nikto", "text": "Nikto scanning http://yahoo.nl"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ Target IP:          13.248.158.7"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ Target Hostname:    yahoo.nl"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ Target Port:        80"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ Start Time:         2025-12-16 16:14:56 (GMT1)"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ Server: ATS"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ The X-XSS-Protection header is not defined. This header can hint to the user agent to protect against some forms of XSS"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ Uncommon header 'referrer-policy' found, with contents: strict-origin-when-cross-origin"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ Root page / redirects to: http://nl.yahoo.com/"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ No CGI Directories found (use '-C all' to force check all possible dirs)"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ 7460 requests: 2 error(s) and 2 item(s) reported on remote host"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ End Time:           2025-12-16 16:24:37 (GMT1) (581 seconds)"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T15:24:37.567434+00:00", "source": "nikto", "text": "+ 1 host(s) tested"}
+{"ts": "2025-12-16T15:24:37.793863+00:00", "source": "nikto", "text": "Nikto scanned 1 hosts."}
+{"ts": "2025-12-16T15:24:38.404480+00:00", "source": "nikto", "text": "[nikto] Nikto scan finished."}
+{"ts": "2025-12-16T15:24:38.415176+00:00", "source": "COMPLETED_WITH_ERRORS", "text": "Recon finished with warnings."}
+{"ts": "2025-12-16T21:25:00.024424+00:00", "source": "scheduler", "text": "Queued for execution."}
+{"ts": "2025-12-16T21:25:12.518990+00:00", "source": "scheduler", "text": "Job dispatched to worker."}
+{"ts": "2025-12-16T21:25:12.518952+00:00", "source": "RUNNING", "text": "Recon started."}
+{"ts": "2025-12-16T21:25:12.550921+00:00", "source": "amass", "text": "[amass] Amass already completed."}
+{"ts": "2025-12-16T21:25:12.551152+00:00", "source": "sublist3r", "text": "[sublist3r] Sublist3r already completed."}
+{"ts": "2025-12-16T21:25:12.551283+00:00", "source": "subfinder", "text": "[subfinder] Subfinder in progress\u2026"}
+{"ts": "2025-12-16T21:25:12.551580+00:00", "source": "assetfinder", "text": "[assetfinder] Assetfinder in progress\u2026"}
+{"ts": "2025-12-16T21:25:12.551683+00:00", "source": "subfinder", "text": "$ /opt/homebrew/bin/subfinder -silent -d yahoo.nl -t 32 -o recon_data/subfinder_yahoo.nl.txt"}
+{"ts": "2025-12-16T21:25:12.551946+00:00", "source": "findomain", "text": "[findomain] Findomain in progress\u2026"}
+{"ts": "2025-12-16T21:25:12.552365+00:00", "source": "assetfinder", "text": "$ /Users/wesleythijs/go/bin/assetfinder --subs-only yahoo.nl"}
+{"ts": "2025-12-16T21:25:12.583747+00:00", "source": "assetfinder", "text": "assetfinder added 1 new subdomains."}
+{"ts": "2025-12-16T21:25:12.584086+00:00", "source": "findomain", "text": "$ /opt/homebrew/bin/findomain --target yahoo.nl --threads 40 --quiet --output recon_data/findomain_yahoo.nl.txt"}
+{"ts": "2025-12-16T21:25:12.603009+00:00", "source": "FINDOMAIN stderr", "text": "error: unexpected argument 'recon_data/findomain_yahoo.nl.txt' found"}
+{"ts": "2025-12-16T21:25:12.603009+00:00", "source": "FINDOMAIN stderr", "text": "Usage: findomain [OPTIONS]"}
+{"ts": "2025-12-16T21:25:12.603009+00:00", "source": "FINDOMAIN stderr", "text": "For more information, try '--help'."}
+{"ts": "2025-12-16T21:25:13.129306+00:00", "source": "ffuf", "text": "[ffuf] Wordlist missing; ffuf skipped."}
+{"ts": "2025-12-16T21:25:13.389788+00:00", "source": "httpx", "text": "[httpx] httpx scanning 1 pending hosts"}
+{"ts": "2025-12-16T21:25:13.479007+00:00", "source": "httpx", "text": "$ /Users/wesleythijs/go/bin/httpx -l recon_data/subs_yahoo.nl_httpx_batch.txt -json -o recon_data/httpx_yahoo.nl.json -timeout 10 -follow-redirects -v"}

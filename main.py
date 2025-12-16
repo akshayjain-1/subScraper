@@ -1724,13 +1724,10 @@ def nuclei_scan(subs_file: Path, domain: str, job_domain: Optional[str] = None) 
 
 
 def _normalize_nikto_severity(value: Any, message: Optional[str] = None) -> str:
-    if value is None and message:
-        text = ""
-    elif value is None:
+    if value is None:
         text = ""
     else:
         text = str(value).strip().lower()
-    message_lower = (message or "").lower()
     numeric_map = {
         "0": "INFO",
         "1": "LOW",
@@ -1741,18 +1738,8 @@ def _normalize_nikto_severity(value: Any, message: Optional[str] = None) -> str:
     }
     if text in numeric_map:
         return numeric_map[text]
-    severity_keywords = [
-        ("CRITICAL", ["remote code execution", "rce", "command execution"]),
-        ("HIGH", ["xss", "cross-site scripting", "sql injection", "sqli", "csrf", "directory traversal", "arbitrary file"]),
-        ("MEDIUM", ["security header", "cookie", "uncommon header", "server banner", "outdated", "deprecated", "ssl"]),
-        ("LOW", ["info", "disclosure", "debug"]),
-    ]
-    for level, keywords in severity_keywords:
-        if any(word in text for word in keywords):
-            return level
-        if any(word in message_lower for word in keywords):
-            return level
-    if text:
+    allowed = {"critical", "high", "medium", "low", "info"}
+    if text in allowed:
         return text.upper()
     return "INFO"
 
@@ -2776,6 +2763,35 @@ button:hover { background:#1d4ed8; }
 .severity-flag.INFO { background:rgba(59,130,246,0.15); border-color:rgba(59,130,246,0.4); color:#bfdbfe; }
 .severity-flag.NONE { background:transparent; border-color:#1f2937; color:#94a3b8; }
 .report-table-note { font-size:12px; color:var(--muted); margin-top:6px; }
+.collapsible { border:1px solid #1f2937; border-radius:14px; margin-top:16px; overflow:hidden; background:#050b18; }
+.collapsible-header { width:100%; background:none; border:none; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; font-size:16px; font-weight:600; color:#e2e8f0; cursor:pointer; }
+.collapsible-header .chevron { transition:transform .2s ease; }
+.collapsible.open .collapsible-header .chevron { transform:rotate(90deg); }
+.collapsible-body { max-height:0; overflow:hidden; transition:max-height .25s ease, padding .25s ease; padding:0 18px; }
+.collapsible.open .collapsible-body { padding:0 18px 18px 18px; max-height:4000px; }
+.collapsible:first-of-type { margin-top:0; }
+.table-pagination { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:10px; font-size:12px; }
+.table-pagination button { border:1px solid #1f2937; background:#0b152c; color:#e2e8f0; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; }
+.table-pagination button[disabled] { opacity:0.4; cursor:not-allowed; }
+.table-pagination .page-info { color:var(--muted); margin-right:auto; }
+.progress-track { margin:12px 0; }
+.progress-track .label { font-size:12px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:4px; }
+.progress-track .progress-bar { height:10px; background:#1e293b; border-radius:999px; overflow:hidden; }
+.progress-track .progress-inner { height:100%; background:#3b82f6; border-radius:999px; transition:width .3s ease; }
+.step-checklist { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-top:14px; }
+.step-checklist .step { padding:8px 10px; border:1px solid #1f2937; border-radius:10px; background:#0b152c; display:flex; justify-content:space-between; align-items:center; font-size:12px; }
+.step-checklist .step span { text-transform:capitalize; }
+.monitor-list { margin-top:18px; display:flex; flex-direction:column; gap:16px; }
+.monitor-card { border:1px solid #1f2937; border-radius:16px; padding:18px; background:#050b18; }
+.monitor-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.monitor-meta { font-size:13px; color:var(--muted); margin-top:4px; }
+.monitor-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.monitor-stats { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; font-size:13px; }
+.monitor-stats span { background:#0b152c; padding:6px 10px; border-radius:10px; border:1px solid #1f2937; }
+.monitor-entry-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+.monitor-entry-table th, .monitor-entry-table td { border:1px solid #1f2937; padding:6px 8px; text-align:left; }
+.monitor-entry-table th { background:#162132; }
+.monitor-entry-note { font-size:12px; color:var(--muted); margin-top:6px; }
 .monitor-list { margin-top:18px; display:flex; flex-direction:column; gap:16px; }
 .monitor-card { border:1px solid #1f2937; border-radius:16px; padding:18px; background:#050b18; }
 .monitor-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
@@ -3099,6 +3115,7 @@ const detailOverlay = document.getElementById('detail-overlay');
 const detailContent = document.getElementById('detail-content');
 const detailClose = document.getElementById('detail-close');
 let latestTargetsData = {};
+let latestConfig = {};
 const historyCache = {};
 const commandHistoryCache = {};
 let selectedReportDomain = null;
@@ -3138,6 +3155,19 @@ const statSubs = document.getElementById('stat-subdomains');
 let launchFormDirty = false;
 let settingsFormDirty = false;
 let monitorsData = [];
+const STEP_SEQUENCE = [
+  { flag: 'amass_done', label: 'Amass' },
+  { flag: 'subfinder_done', label: 'Subfinder' },
+  { flag: 'assetfinder_done', label: 'Assetfinder' },
+  { flag: 'findomain_done', label: 'Findomain' },
+  { flag: 'sublist3r_done', label: 'Sublist3r' },
+  { flag: 'ffuf_done', label: 'ffuf' },
+  { flag: 'httpx_done', label: 'httpx' },
+  { flag: 'screenshots_done', label: 'Screenshots', skipWhen: () => latestConfig.enable_screenshots === false },
+  { flag: 'nuclei_done', label: 'Nuclei' },
+  { flag: 'nikto_done', label: 'Nikto', skipWhen: (info) => shouldSkipNikto(info) },
+];
+const DEFAULT_PAGE_SIZE = 50;
 
 const STATUS_LABELS = {
   queued: 'Queued',
@@ -3220,6 +3250,92 @@ function formatSeverityLabel(value) {
   return value.charAt(0) + value.slice(1).toLowerCase();
 }
 
+function getPaginationState(table) {
+  return table && table._paginationState;
+}
+
+function initPagination(table, pagerEl, pageSize = DEFAULT_PAGE_SIZE) {
+  if (!table || !pagerEl) return;
+  const state = {
+    table,
+    pagerEl,
+    pageSize: Math.max(1, pageSize || DEFAULT_PAGE_SIZE),
+    currentPage: 1,
+    totalPages: 1,
+  };
+  if (pagerEl._paginationHandler) {
+    pagerEl.removeEventListener('click', pagerEl._paginationHandler);
+  }
+  const handleClick = (event) => {
+    const btn = event.target.closest('[data-page-action]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-page-action');
+    if (action === 'prev') {
+      state.currentPage = Math.max(1, state.currentPage - 1);
+    } else if (action === 'next') {
+      state.currentPage = Math.min(state.totalPages, state.currentPage + 1);
+    } else if (action === 'first') {
+      state.currentPage = 1;
+    } else if (action === 'last') {
+      state.currentPage = state.totalPages;
+    }
+    refreshPagination(table);
+  };
+  pagerEl._paginationHandler = handleClick;
+  pagerEl.addEventListener('click', handleClick);
+  table._paginationState = state;
+  refreshPagination(table);
+}
+
+function refreshPagination(table) {
+  const state = getPaginationState(table);
+  if (!state) return;
+  const rows = Array.from(table.tBodies[0] ? table.tBodies[0].rows : []);
+  let visibleCount = 0;
+  rows.forEach(row => {
+    if (row.dataset.filterHidden === undefined) {
+      row.dataset.filterHidden = 'false';
+    }
+    if (row.dataset.filterHidden === 'true') {
+      row.style.display = 'none';
+    }
+  });
+  rows.forEach(row => {
+    if (row.dataset.filterHidden === 'true') return;
+    visibleCount += 1;
+  });
+  state.totalPages = Math.max(1, Math.ceil(visibleCount / state.pageSize));
+  if (state.currentPage > state.totalPages) {
+    state.currentPage = state.totalPages;
+  }
+  let visibleIndex = 0;
+  const start = (state.currentPage - 1) * state.pageSize;
+  const end = start + state.pageSize;
+  rows.forEach(row => {
+    if (row.dataset.filterHidden === 'true') {
+      row.style.display = 'none';
+      return;
+    }
+    const inPage = visibleIndex >= start && visibleIndex < end;
+    row.style.display = inPage ? '' : 'none';
+    visibleIndex += 1;
+  });
+  const pagerEl = state.pagerEl;
+  if (!pagerEl) return;
+  if (state.totalPages <= 1) {
+    pagerEl.innerHTML = '';
+    return;
+  }
+  pagerEl.innerHTML = `
+    <span class="page-info">${visibleCount} rows</span>
+    <button data-page-action="first" ${state.currentPage === 1 ? 'disabled' : ''}>&laquo;</button>
+    <button data-page-action="prev" ${state.currentPage === 1 ? 'disabled' : ''}>&lsaquo;</button>
+    <span>Page ${state.currentPage} / ${state.totalPages}</span>
+    <button data-page-action="next" ${state.currentPage === state.totalPages ? 'disabled' : ''}>&rsaquo;</button>
+    <button data-page-action="last" ${state.currentPage === state.totalPages ? 'disabled' : ''}>&raquo;</button>
+  `;
+}
+
 function makeSortable(table) {
   if (!table) return;
   const headers = table.querySelectorAll('th[data-sort-key]');
@@ -3239,6 +3355,7 @@ function makeSortable(table) {
         return 0;
       });
       rows.forEach(row => table.tBodies[0].appendChild(row));
+      refreshPagination(table);
     });
   });
 }
@@ -3571,11 +3688,37 @@ function computeReportStats(info) {
   let niktoCount = 0;
   let screenshotCount = 0;
   let maxSeverity = 'NONE';
+  let processedSubdomains = 0;
+  let pendingSubdomains = 0;
+  let pendingHttp = 0;
+  let pendingScreenshots = 0;
+  let pendingNuclei = 0;
+  let pendingNikto = 0;
+  const cfg = latestConfig || {};
+  const enableScreenshots = cfg.enable_screenshots !== false;
+  const skipNiktoDefault = !!cfg.skip_nikto_by_default;
+  const options = info && info.options || {};
+  const skipNikto = options.skip_nikto !== undefined ? !!options.skip_nikto : skipNiktoDefault;
   subs.forEach(entry => {
+    const scans = entry && entry.scans || {};
+    const httpDone = !!(entry && entry.httpx) || !!scans.httpx;
+    const screenshotDone = !enableScreenshots || !!(entry && entry.screenshot) || !!scans.screenshots;
+    const nucleiDone = !!scans.nuclei;
+    const niktoRequired = !skipNikto;
+    const niktoDone = !niktoRequired || !!scans.nikto;
     if (entry && entry.httpx) httpCount += 1;
     nucleiCount += Array.isArray(entry && entry.nuclei) ? entry.nuclei.length : 0;
     niktoCount += Array.isArray(entry && entry.nikto) ? entry.nikto.length : 0;
     if (entry && entry.screenshot) screenshotCount += 1;
+    if (!httpDone) pendingHttp += 1;
+    if (enableScreenshots && !screenshotDone) pendingScreenshots += 1;
+    if (!nucleiDone) pendingNuclei += 1;
+    if (niktoRequired && !niktoDone) pendingNikto += 1;
+    if (httpDone && screenshotDone && nucleiDone && niktoDone) {
+      processedSubdomains += 1;
+    } else {
+      pendingSubdomains += 1;
+    }
     (entry && entry.nuclei || []).forEach(finding => {
       const sev = normalizeSeverity(finding && finding.severity, 'INFO');
       if (severityIsHigher(sev, maxSeverity)) {
@@ -3596,6 +3739,13 @@ function computeReportStats(info) {
     nikto: niktoCount,
     screenshots: screenshotCount,
     maxSeverity,
+    processed_subdomains: processedSubdomains,
+    pending_subdomains: pendingSubdomains,
+    pending_http: pendingHttp,
+    pending_screenshots: pendingScreenshots,
+    pending_nuclei: pendingNuclei,
+    pending_nikto: pendingNikto,
+    progress: subs.length ? Math.min(100, Math.round((processedSubdomains / subs.length) * 100)) : (info && info.flags && Object.values(info.flags).every(Boolean) ? 100 : 0),
   };
 }
 
@@ -3661,6 +3811,42 @@ function renderReports(targets) {
     </div>
   `;
   renderReportDetail(selectedReportDomain);
+}
+
+function shouldSkipNikto(info) {
+  const options = info && info.options || {};
+  if (options.skip_nikto !== undefined) {
+    return !!options.skip_nikto;
+  }
+  return !!(latestConfig && latestConfig.skip_nikto_by_default);
+}
+
+function renderCollapsibleSection(id, title, body, open = false) {
+  return `
+    <div class="collapsible ${open ? 'open' : ''}" data-collapsible="${escapeHtml(id)}">
+      <button class="collapsible-header" type="button">
+        <span>${escapeHtml(title)}</span>
+        <span class="chevron">▶</span>
+      </button>
+      <div class="collapsible-body">
+        ${body}
+      </div>
+    </div>
+  `;
+}
+
+function buildStepChecklist(info) {
+  const flags = info && info.flags ? info.flags : {};
+  return STEP_SEQUENCE.map(step => {
+    const skipped = step.skipWhen ? step.skipWhen(info) : false;
+    const status = skipped ? 'skipped' : (flags[step.flag] ? 'completed' : 'pending');
+    return `
+      <div class="step">
+        <span>${escapeHtml(step.label)}</span>
+        <span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 function monitorStatusClass(value) {
@@ -3946,16 +4132,11 @@ function renderReportDetail(domain) {
         </tr>
       `).join('')
     : '';
-  detail.innerHTML = `
-    <div class="report-header">
-      <div>
-        <h3>${escapeHtml(domain)}</h3>
-        ${badge}
-      </div>
-      <div class="report-actions">
-        ${resumeButton}
-        ${resumeNotice}
-      </div>
+  const overviewBody = `
+    <div class="progress-track">
+      <div class="label">Run progress</div>
+      <div class="progress-bar"><div class="progress-inner" style="width:${stats.progress}%"></div></div>
+      <div class="muted">${stats.progress}% complete (${stats.processed_subdomains}/${stats.subdomains || 0} fully processed)</div>
     </div>
     <div class="report-stats-grid">
       <div class="report-stat">
@@ -3983,80 +4164,128 @@ function renderReportDetail(domain) {
         <div class="value">${maxSeverityFlag}</div>
       </div>
     </div>
-    <div class="report-section">
-      <h4>Subdomains</h4>
-      <div class="filter-bar">
-        <div class="filter-group" data-status-filter>
-          ${statusFilters}
-        </div>
-        <input type="search" class="report-search" placeholder="Search subdomains…" data-sub-search />
+    <div class="report-stats-grid">
+      <div class="report-stat">
+        <div class="label">Pending subdomains</div>
+        <div class="value">${stats.pending_subdomains}</div>
       </div>
-      <div class="table-wrapper">
-        <table class="targets-table" id="subdomains-table">
-          <thead>
-            <tr>
-              <th data-sort-key="host">Subdomain</th>
-              <th data-sort-key="status" data-sort-type="number">Status</th>
-              <th data-sort-key="title">Title</th>
-              <th data-sort-key="server">Server</th>
-              <th data-sort-key="screenshot" data-sort-type="number">Screenshot</th>
-              <th data-sort-key="nuclei" data-sort-type="number">Nuclei</th>
-              <th data-sort-key="nikto" data-sort-type="number">Nikto</th>
-              <th data-sort-key="sources">Sources</th>
-            </tr>
-          </thead>
-          <tbody>${subTableRows}</tbody>
-        </table>
+      <div class="report-stat">
+        <div class="label">Pending HTTP</div>
+        <div class="value">${stats.pending_http}</div>
       </div>
-      <p class="report-table-note">Click a subdomain to explore its detailed timeline.</p>
-    </div>
-    <div class="report-section">
-      <h4>Nuclei Findings</h4>
-      ${nucleiRows.length ? `<div class="filter-bar" data-nuclei-filter><div class="filter-group">${nucleiFilters}</div></div>` : ''}
-      ${nucleiRows.length ? `
-        <div class="table-wrapper">
-          <table class="targets-table" id="nuclei-table">
-            <thead>
-              <tr>
-                <th data-sort-key="severity">Severity</th>
-                <th data-sort-key="host">Host</th>
-                <th data-sort-key="template">Template</th>
-                <th data-sort-key="name">Name</th>
-                <th data-sort-key="location">Matched</th>
-              </tr>
-            </thead>
-            <tbody>${nucleiTableRows}</tbody>
-          </table>
-        </div>` : '<p class="muted">No nuclei findings recorded.</p>'}
-    </div>
-    <div class="report-section">
-      <h4>Nikto Findings</h4>
-      ${niktoRows.length ? `<div class="filter-bar" data-nikto-filter><div class="filter-group">${niktoFilters}</div></div>` : ''}
-      ${niktoRows.length ? `
-        <div class="table-wrapper">
-          <table class="targets-table" id="nikto-table">
-            <thead>
-              <tr>
-                <th data-sort-key="severity">Severity</th>
-                <th data-sort-key="host">Host</th>
-                <th data-sort-key="message">Message</th>
-                <th data-sort-key="reference">Reference</th>
-              </tr>
-            </thead>
-            <tbody>${niktoTableRows}</tbody>
-          </table>
-        </div>` : '<p class="muted">No Nikto findings recorded.</p>'}
-    </div>
-    <div class="report-section">
-      <h4>Command History</h4>
-      <div data-command-log data-command-domain="${escapeHtml(domain)}">
-        <p class="muted">Loading command history…</p>
+      <div class="report-stat">
+        <div class="label">Pending screenshots</div>
+        <div class="value">${stats.pending_screenshots}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Pending nuclei</div>
+        <div class="value">${stats.pending_nuclei}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Pending nikto</div>
+        <div class="value">${stats.pending_nikto}</div>
       </div>
     </div>
+    <div class="step-checklist">
+      ${buildStepChecklist(info)}
+    </div>
+  `;
+  const subPaginationId = 'subdomains-pagination';
+  const nucleiPaginationId = 'nuclei-pagination';
+  const niktoPaginationId = 'nikto-pagination';
+  const subdomainsTitle = `Subdomains (${stats.subdomains})`;
+  const nucleiTitle = `Nuclei Findings (${nucleiRows.length})`;
+  const niktoTitle = `Nikto Findings (${niktoRows.length})`;
+  const subdomainsBody = `
+    <div class="filter-bar">
+      <div class="filter-group" data-status-filter>
+        ${statusFilters}
+      </div>
+      <input type="search" class="report-search" placeholder="Search subdomains…" data-sub-search />
+    </div>
+    <div class="table-wrapper">
+      <table class="targets-table" id="subdomains-table">
+        <thead>
+          <tr>
+            <th data-sort-key="host">Subdomain</th>
+            <th data-sort-key="status" data-sort-type="number">Status</th>
+            <th data-sort-key="title">Title</th>
+            <th data-sort-key="server">Server</th>
+            <th data-sort-key="screenshot" data-sort-type="number">Screenshot</th>
+            <th data-sort-key="nuclei" data-sort-type="number">Nuclei</th>
+            <th data-sort-key="nikto" data-sort-type="number">Nikto</th>
+            <th data-sort-key="sources">Sources</th>
+          </tr>
+        </thead>
+        <tbody>${subTableRows}</tbody>
+      </table>
+    </div>
+    <div class="table-pagination" id="${subPaginationId}"></div>
+    <p class="report-table-note">Click a subdomain to explore its detailed timeline.</p>
+  `;
+  const nucleiContent = nucleiRows.length ? `
+    ${nucleiRows.length ? `<div class="filter-bar" data-nuclei-filter><div class="filter-group">${nucleiFilters}</div></div>` : ''}
+    <div class="table-wrapper">
+      <table class="targets-table" id="nuclei-table">
+        <thead>
+          <tr>
+            <th data-sort-key="severity">Severity</th>
+            <th data-sort-key="host">Host</th>
+            <th data-sort-key="template">Template</th>
+            <th data-sort-key="name">Name</th>
+            <th data-sort-key="location">Matched</th>
+          </tr>
+        </thead>
+        <tbody>${nucleiTableRows}</tbody>
+      </table>
+    </div>
+    <div class="table-pagination" id="${nucleiPaginationId}"></div>
+  ` : '<p class="muted">No nuclei findings recorded.</p>';
+  const niktoContent = niktoRows.length ? `
+    ${niktoRows.length ? `<div class="filter-bar" data-nikto-filter><div class="filter-group">${niktoFilters}</div></div>` : ''}
+    <div class="table-wrapper">
+      <table class="targets-table" id="nikto-table">
+        <thead>
+          <tr>
+            <th data-sort-key="severity">Severity</th>
+            <th data-sort-key="host">Host</th>
+            <th data-sort-key="message">Message</th>
+            <th data-sort-key="reference">Reference</th>
+          </tr>
+        </thead>
+        <tbody>${niktoTableRows}</tbody>
+      </table>
+    </div>
+    <div class="table-pagination" id="${niktoPaginationId}"></div>
+  ` : '<p class="muted">No Nikto findings recorded.</p>';
+  const commandsBody = `
+    <div data-command-log data-command-domain="${escapeHtml(domain)}">
+      <p class="muted">Loading command history…</p>
+    </div>
+  `;
+  detail.innerHTML = `
+    <div class="report-header">
+      <div>
+        <h3>${escapeHtml(domain)}</h3>
+        ${badge}
+      </div>
+      <div class="report-actions">
+        ${resumeButton}
+        ${resumeNotice}
+      </div>
+    </div>
+    ${renderCollapsibleSection('overview', 'Overview', overviewBody, true)}
+    ${renderCollapsibleSection('subdomains', subdomainsTitle, subdomainsBody, true)}
+    ${renderCollapsibleSection('nuclei', nucleiTitle, nucleiContent, nucleiRows.length > 0)}
+    ${renderCollapsibleSection('nikto', niktoTitle, niktoContent, false)}
+    ${renderCollapsibleSection('commands', 'Command History', commandsBody, false)}
   `;
   makeSortable(detail.querySelector('#subdomains-table'));
   makeSortable(detail.querySelector('#nuclei-table'));
   makeSortable(detail.querySelector('#nikto-table'));
+  initPagination(detail.querySelector('#subdomains-table'), detail.querySelector('#' + subPaginationId), DEFAULT_PAGE_SIZE);
+  initPagination(detail.querySelector('#nuclei-table'), detail.querySelector('#' + nucleiPaginationId), DEFAULT_PAGE_SIZE);
+  initPagination(detail.querySelector('#nikto-table'), detail.querySelector('#' + niktoPaginationId), DEFAULT_PAGE_SIZE);
   attachSubdomainFilters(detail);
   attachSeverityFilter(detail.querySelector('[data-nuclei-filter]'), detail.querySelector('#nuclei-table'));
   attachSeverityFilter(detail.querySelector('[data-nikto-filter]'), detail.querySelector('#nikto-table'));
@@ -4084,8 +4313,9 @@ function attachSubdomainFilters(detailEl) {
       const title = row.dataset.title || '';
       const matchesStatus = !allowed || allowed.has(status);
       const matchesSearch = !query || host.includes(query) || title.includes(query);
-      row.style.display = matchesStatus && matchesSearch ? '' : 'none';
+      row.dataset.filterHidden = matchesStatus && matchesSearch ? 'false' : 'true';
     });
+    refreshPagination(table);
   };
   if (statusGroup) {
     statusGroup.querySelectorAll('input[type="checkbox"]').forEach(input => input.addEventListener('change', apply));
@@ -4105,8 +4335,9 @@ function attachSeverityFilter(wrapper, table) {
     const rows = table.tBodies[0] ? Array.from(table.tBodies[0].rows) : [];
     rows.forEach(row => {
       const sev = row.dataset.severity || 'INFO';
-      row.style.display = allowed.has(sev) ? '' : 'none';
+      row.dataset.filterHidden = allowed.has(sev) ? 'false' : 'true';
     });
+    refreshPagination(table);
   };
   checkboxes.forEach(cb => cb.addEventListener('change', apply));
   apply();
@@ -4240,6 +4471,19 @@ jobsList.addEventListener('click', (event) => {
     handleJobControl('resume', domain, resumeBtn);
   }
 });
+
+document.addEventListener('click', (event) => {
+  const header = event.target.closest('.collapsible-header');
+  if (!header) return;
+  const container = header.closest('.collapsible');
+  if (!container) return;
+  container.classList.toggle('open');
+  const body = container.querySelector('.collapsible-body');
+  if (!body) return;
+  if (!container.classList.contains('open')) {
+    body.scrollTop = 0;
+  }
+});
 function renderSettings(config, tools) {
   settingsSummary.innerHTML = `
     <div class="paths-grid">
@@ -4306,6 +4550,7 @@ async function fetchState() {
     const resp = await fetch('/api/state');
     if (!resp.ok) throw new Error('Failed to fetch state');
     const data = await resp.json();
+    latestConfig = data.config || {};
     latestRunningJobs = data.running_jobs || [];
     latestQueuedJobs = data.queued_jobs || [];
     document.getElementById('last-updated').textContent = 'Last updated: ' + (data.last_updated || 'never');

@@ -98,3 +98,17 @@
 {"ts": "2025-12-16T15:10:48.623138+00:00", "source": "nuclei", "text": "[nuclei] nuclei scan finished."}
 {"ts": "2025-12-16T15:10:49.295487+00:00", "source": "nikto", "text": "[nikto] Nikto scan finished."}
 {"ts": "2025-12-16T15:11:09.297846+00:00", "source": "COMPLETED_WITH_ERRORS", "text": "Recon finished with warnings."}
+{"ts": "2025-12-16T21:24:49.966927+00:00", "source": "RUNNING", "text": "Recon started."}
+{"ts": "2025-12-16T21:24:49.967059+00:00", "source": "scheduler", "text": "Job dispatched to worker."}
+{"ts": "2025-12-16T21:24:50.009731+00:00", "source": "amass", "text": "[amass] Input is a subdomain; Amass skipped."}
+{"ts": "2025-12-16T21:24:50.014736+00:00", "source": "subfinder", "text": "[subfinder] Input is a subdomain; Subfinder skipped."}
+{"ts": "2025-12-16T21:24:50.277450+00:00", "source": "assetfinder", "text": "[assetfinder] Input is a subdomain; Assetfinder skipped."}
+{"ts": "2025-12-16T21:24:50.385985+00:00", "source": "ffuf", "text": "[ffuf] Wordlist missing; ffuf skipped."}
+{"ts": "2025-12-16T21:24:57.323954+00:00", "source": "httpx", "text": "[httpx] httpx scan finished."}
+{"ts": "2025-12-16T21:24:57.351323+00:00", "source": "screenshots", "text": "[screenshots] Capturing screenshots for 1 hosts"}
+{"ts": "2025-12-16T21:24:57.351659+00:00", "source": "scheduler", "text": "Waiting for screenshot slot..."}
+{"ts": "2025-12-16T21:24:57.351804+00:00", "source": "scheduler", "text": "Screenshot slot acquired."}
+{"ts": "2025-12-16T21:24:59.056433+00:00", "source": "screenshots", "text": "Screenshot batch failed."}
+{"ts": "2025-12-16T21:24:59.056758+00:00", "source": "screenshots", "text": "[screenshots] Screenshot capture failed."}
+{"ts": "2025-12-16T21:24:59.294375+00:00", "source": "nuclei", "text": "[nuclei] nuclei scan finished."}
+{"ts": "2025-12-16T21:24:59.545311+00:00", "source": "nikto", "text": "[nikto] Nikto scan finished."}
