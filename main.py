@@ -16,6 +16,7 @@ Features:
 """
 
 import argparse
+import copy
 import csv
 import io
 import json
@@ -27,13 +28,16 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from collections import deque
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse, unquote
+from urllib.request import Request, urlopen
 
 # ====================== CONFIG ======================
 
@@ -44,6 +48,7 @@ LOCK_FILE = DATA_DIR / ".lock"
 CONFIG_FILE = DATA_DIR / "config.json"
 HISTORY_DIR = DATA_DIR / "history"
 SCREENSHOTS_DIR = DATA_DIR / "screenshots"
+MONITORS_FILE = DATA_DIR / "monitors.json"
 
 DEFAULT_INTERVAL = 30
 HTML_REFRESH_SECONDS = DEFAULT_INTERVAL  # default; can be overridden
@@ -126,6 +131,48 @@ STEP_PROGRESS = {
     "error": 100,
     "failed": 100,
 }
+
+
+class JobControl:
+    def __init__(self):
+        self._cond = threading.Condition()
+        self._pause_requested = False
+
+    def request_pause(self) -> bool:
+        with self._cond:
+            if self._pause_requested:
+                return False
+            self._pause_requested = True
+            self._cond.notify_all()
+            return True
+
+    def request_resume(self) -> bool:
+        with self._cond:
+            if not self._pause_requested:
+                return False
+            self._pause_requested = False
+            self._cond.notify_all()
+            return True
+
+    def is_pause_requested(self) -> bool:
+        with self._cond:
+            return self._pause_requested
+
+    def wait_until_resumed(self) -> None:
+        with self._cond:
+            while self._pause_requested:
+                self._cond.wait()
+
+
+JOB_CONTROLS: Dict[str, JobControl] = {}
+JOB_CONTROL_LOCK = threading.Lock()
+ACTIVE_PAUSED_JOBS: set = set()
+MONITOR_LOCK = threading.Lock()
+MONITOR_STATE: Dict[str, Dict[str, Any]] = {}
+MONITOR_THREAD: Optional[threading.Thread] = None
+MONITOR_POLL_INTERVAL = 10
+DEFAULT_MONITOR_INTERVAL = 300
+MAX_MONITOR_ENTRIES = 200
 
 
 # ================== UTILITIES =======================
@@ -221,6 +268,7 @@ def default_config() -> Dict[str, Any]:
         "enable_assetfinder": True,
         "enable_findomain": True,
         "enable_sublist3r": True,
+        "wildcard_tlds": ["com", "net", "org", "io", "co", "app", "dev", "us", "uk", "in", "de"],
         "subfinder_threads": 32,
         "assetfinder_threads": 10,
         "findomain_threads": 40,
@@ -230,6 +278,249 @@ def default_config() -> Dict[str, Any]:
         "max_parallel_gowitness": 1,
         "max_running_jobs": 1,
     }
+
+
+# ================== MONITOR MANAGEMENT ==================
+
+
+def load_monitors_state() -> Dict[str, Any]:
+    ensure_dirs()
+    data = {"monitors": {}}
+    if MONITORS_FILE.exists():
+        try:
+            with open(MONITORS_FILE, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            if isinstance(raw, dict) and isinstance(raw.get("monitors"), dict):
+                data = raw
+        except Exception as exc:
+            log(f"Error loading monitors.json: {exc}")
+    else:
+        save_monitors_state()
+    with MONITOR_LOCK:
+        MONITOR_STATE.clear()
+        MONITOR_STATE.update(data.get("monitors", {}))
+    return get_monitors_snapshot()
+
+
+def _save_monitors_locked() -> None:
+    payload = {"monitors": MONITOR_STATE}
+    tmp_path = MONITORS_FILE.with_suffix(".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
+    tmp_path.replace(MONITORS_FILE)
+
+
+def save_monitors_state() -> None:
+    ensure_dirs()
+    with MONITOR_LOCK:
+        _save_monitors_locked()
+
+
+def get_monitors_snapshot() -> List[Dict[str, Any]]:
+    with MONITOR_LOCK:
+        snapshot = copy.deepcopy(MONITOR_STATE)
+    return list(snapshot.values())
+
+
+def list_monitors(limit_entries: int = MAX_MONITOR_ENTRIES) -> List[Dict[str, Any]]:
+    with MONITOR_LOCK:
+        monitors = []
+        for monitor in MONITOR_STATE.values():
+            data = copy.deepcopy(monitor)
+            entries_map = data.get("entries") or {}
+            entry_items = list(entries_map.values())
+            entry_items.sort(key=lambda item: item.get("first_seen") or "", reverse=True)
+            total_entries = len(entry_items)
+            data["entry_count"] = total_entries
+            data["pending_entries"] = sum(1 for item in entry_items if item.get("status") != "dispatched")
+            if total_entries > limit_entries:
+                data["entries_truncated"] = True
+                entry_items = entry_items[:limit_entries]
+            else:
+                data["entries_truncated"] = False
+            data["entries"] = entry_items
+            next_ts = data.get("next_check_ts")
+            if isinstance(next_ts, (int, float)):
+                data["next_check"] = datetime.fromtimestamp(next_ts, tz=timezone.utc).isoformat()
+            else:
+                data["next_check"] = None
+            monitors.append(data)
+    monitors.sort(key=lambda item: item.get("name") or item.get("url") or item.get("id") or "")
+    return monitors
+
+
+def add_monitor(name: str, url: str, interval: Optional[int]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    cleaned_url = str(url or "").strip()
+    if not cleaned_url:
+        return False, "Monitor URL is required.", None
+    parsed = urlparse(cleaned_url)
+    if parsed.scheme not in {"http", "https"}:
+        return False, "Monitor URL must start with http:// or https://", None
+    try:
+        interval_val = max(60, int(interval or DEFAULT_MONITOR_INTERVAL))
+    except (TypeError, ValueError):
+        return False, "Interval must be an integer >= 60 seconds.", None
+    monitor_id = uuid.uuid4().hex
+    now_iso = datetime.now(timezone.utc).isoformat()
+    monitor = {
+        "id": monitor_id,
+        "name": (name or "").strip(),
+        "url": cleaned_url,
+        "interval": interval_val,
+        "created_at": now_iso,
+        "last_checked": None,
+        "last_status": "pending",
+        "last_error": "",
+        "last_entry_count": 0,
+        "last_new_entries": 0,
+        "last_dispatch_count": 0,
+        "entries": {},
+        "next_check_ts": time.time(),
+    }
+    with MONITOR_LOCK:
+        MONITOR_STATE[monitor_id] = monitor
+        _save_monitors_locked()
+    log(f"Added monitor {monitor_id} for {cleaned_url}")
+    return True, "Monitor added.", copy.deepcopy(monitor)
+
+
+def remove_monitor(monitor_id: str) -> Tuple[bool, str]:
+    monitor_key = (monitor_id or "").strip()
+    if not monitor_key:
+        return False, "Monitor id is required."
+    with MONITOR_LOCK:
+        if monitor_key not in MONITOR_STATE:
+            return False, "Monitor not found."
+        MONITOR_STATE.pop(monitor_key, None)
+        _save_monitors_locked()
+    log(f"Removed monitor {monitor_key}")
+    return True, "Monitor removed."
+
+
+def parse_monitor_entries(text: str) -> List[str]:
+    entries: List[str] = []
+    if not text:
+        return entries
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        entries.append(line)
+    return entries
+
+
+def fetch_monitor_source(url: str, timeout: int = 20) -> str:
+    req = Request(url, headers={"User-Agent": "ReconMonitor/1.0"})
+    with urlopen(req, timeout=timeout) as resp:
+        data = resp.read()
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("latin-1", errors="ignore")
+
+
+def process_monitor(monitor_id: str) -> None:
+    cfg = get_config()
+    with MONITOR_LOCK:
+        monitor = MONITOR_STATE.get(monitor_id)
+        if not monitor:
+            return
+        monitor_copy = copy.deepcopy(monitor)
+    url = monitor_copy.get("url")
+    interval = max(60, int(monitor_copy.get("interval") or DEFAULT_MONITOR_INTERVAL))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        content = fetch_monitor_source(url)
+    except Exception as exc:
+        with MONITOR_LOCK:
+            target = MONITOR_STATE.get(monitor_id)
+            if target:
+                target["last_checked"] = now_iso
+                target["last_status"] = "error"
+                target["last_error"] = str(exc)
+                target["next_check_ts"] = time.time() + interval
+                _save_monitors_locked()
+        log(f"Monitor {monitor_id} fetch failed: {exc}")
+        return
+    entries = parse_monitor_entries(content)
+    entries_map = monitor_copy.get("entries") or {}
+    if not isinstance(entries_map, dict):
+        entries_map = {}
+    existing_map = {key: dict(value) for key, value in entries_map.items()}
+    new_entries: List[Dict[str, Any]] = []
+    for entry in entries:
+        meta = existing_map.get(entry)
+        if meta:
+            meta["last_seen"] = now_iso
+        else:
+            meta = {
+                "value": entry,
+                "first_seen": now_iso,
+                "last_seen": now_iso,
+                "status": "pending",
+                "dispatch_message": "",
+                "dispatch_results": [],
+                "dispatched_targets": [],
+                "last_dispatch": None,
+            }
+            existing_map[entry] = meta
+            new_entries.append(meta)
+    dispatched_count = 0
+    skip_nikto = bool(cfg.get("skip_nikto_by_default", False))
+    for meta in new_entries:
+        success, message, details = start_targets_from_input(meta["value"], None, skip_nikto, None)
+        meta["last_dispatch"] = now_iso
+        meta["dispatch_message"] = message
+        meta["dispatch_results"] = details
+        meta["dispatched_targets"] = [info["target"] for info in details if info.get("success")]
+        meta["status"] = "dispatched" if success else "error"
+        if success:
+            dispatched_count += 1
+    with MONITOR_LOCK:
+        monitor_ref = MONITOR_STATE.get(monitor_id)
+        if not monitor_ref:
+            return
+        monitor_ref["entries"] = existing_map
+        monitor_ref["last_checked"] = now_iso
+        monitor_ref["last_status"] = "ok"
+        monitor_ref["last_error"] = ""
+        monitor_ref["last_entry_count"] = len(entries)
+        monitor_ref["last_new_entries"] = len(new_entries)
+        monitor_ref["last_dispatch_count"] = dispatched_count
+        monitor_ref["next_check_ts"] = time.time() + interval
+        _save_monitors_locked()
+
+
+def monitor_worker_loop() -> None:
+    while True:
+        time.sleep(MONITOR_POLL_INTERVAL)
+        with MONITOR_LOCK:
+            due_ids = []
+            now_ts = time.time()
+            for monitor_id, monitor in MONITOR_STATE.items():
+                next_ts = monitor.get("next_check_ts") or 0
+                interval = max(60, int(monitor.get("interval") or DEFAULT_MONITOR_INTERVAL))
+                if now_ts >= next_ts:
+                    monitor["next_check_ts"] = now_ts + interval
+                    due_ids.append(monitor_id)
+        for monitor_id in due_ids:
+            try:
+                process_monitor(monitor_id)
+            except Exception as exc:
+                log(f"Monitor {monitor_id} processing error: {exc}")
+
+
+def start_monitor_worker() -> None:
+    global MONITOR_THREAD
+    with MONITOR_LOCK:
+        already_running = MONITOR_THREAD and MONITOR_THREAD.is_alive()
+    if already_running:
+        return
+    load_monitors_state()
+    thread = threading.Thread(target=monitor_worker_loop, name="monitor-worker", daemon=True)
+    thread.start()
+    with MONITOR_LOCK:
+        MONITOR_THREAD = thread
 
 
 def save_config(cfg: Dict[str, Any]) -> None:
@@ -286,6 +577,76 @@ def bool_from_value(value: Any, default: bool = False) -> bool:
     return default
 
 
+def _sanitize_domain_input(value: str) -> str:
+    if not value:
+        return ""
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return ""
+    cleaned = cleaned.replace("https://", "").replace("http://", "")
+    for delimiter in ("?", "#", "/"):
+        if delimiter in cleaned:
+            cleaned = cleaned.split(delimiter, 1)[0]
+    cleaned = cleaned.strip()
+    cleaned = re.sub(r"\s+", "", cleaned)
+    return cleaned
+
+
+def _normalize_tld_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_items = re.split(r"[,\s]+", value)
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = list(value)
+    else:
+        raw_items = [value]
+    result: List[str] = []
+    seen: set = set()
+    for item in raw_items:
+        text = str(item or "").strip().lower().lstrip(".")
+        if not text:
+            continue
+        if text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
+def expand_wildcard_targets(raw: str, config: Optional[Dict[str, Any]] = None) -> List[str]:
+    normalized = _sanitize_domain_input(raw)
+    if not normalized:
+        return []
+    while normalized.startswith("*."):
+        normalized = normalized[2:]
+    trailing_any_tld = normalized.endswith(".*")
+    if trailing_any_tld:
+        normalized = normalized[:-2]
+    normalized = normalized.strip(".")
+    if not normalized:
+        return []
+    candidates: List[str] = []
+    if trailing_any_tld:
+        cfg = config or get_config()
+        tlds = _normalize_tld_list(cfg.get("wildcard_tlds"))
+        for suffix in tlds:
+            if not suffix:
+                continue
+            candidates.append(f"{normalized}.{suffix}")
+    else:
+        candidates.append(normalized)
+    deduped: List[str] = []
+    seen: set = set()
+    for candidate in candidates:
+        cleaned = candidate.strip(".")
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        deduped.append(cleaned)
+    return deduped
+
+
 def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
     cfg = get_config()
     changed = False
@@ -303,6 +664,12 @@ def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str,
             return False, "Default interval must be an integer >= 5.", cfg
         if cfg.get("default_interval") != new_interval:
             cfg["default_interval"] = new_interval
+            changed = True
+
+    if "wildcard_tlds" in values:
+        new_tlds = _normalize_tld_list(values.get("wildcard_tlds"))
+        if cfg.get("wildcard_tlds", []) != new_tlds:
+            cfg["wildcard_tlds"] = new_tlds
             changed = True
 
     if "skip_nikto_by_default" in values:
@@ -667,6 +1034,8 @@ def run_subprocess(
     display_cmd = " ".join(cmd)
     log(f"Running: {display_cmd}")
     if job_domain:
+        job_pause_point(job_domain)
+    if job_domain:
         job_log_append(job_domain, f"$ {display_cmd}", source=step or "command")
     try:
         merged_env = os.environ.copy()
@@ -883,6 +1252,7 @@ def harvest_enumerator_outputs(
     seen_cache: Dict[str, set],
     job_domain: Optional[str] = None,
 ) -> bool:
+    job_pause_point(job_domain)
     state = None
     added = False
 
@@ -969,7 +1339,7 @@ def run_downstream_pipeline(
             subs = sorted(tgt["subdomains"].keys())
             if subs or enumerators_done_event.is_set():
                 return subs
-            time.sleep(5)
+            job_sleep(job_domain, 5)
 
     all_subs = wait_for_subdomains()
     log(f"Total unique subdomains for {domain}: {len(all_subs)}")
@@ -1004,20 +1374,24 @@ def run_downstream_pipeline(
     httpx_processed: set = set()
     while True:
         state = load_state()
-        flags = ensure_target_state(state, domain)["flags"]
-        all_subs = sorted(ensure_target_state(state, domain)["subdomains"].keys())
-        new_hosts = [s for s in all_subs if s not in httpx_processed]
-        if not flags.get("httpx_done") and httpx_processed == set():
-            log(f"=== httpx scan for {domain} ({len(all_subs)} hosts) ===")
+        tgt_state = ensure_target_state(state, domain)
+        flags = tgt_state["flags"]
+        submap = tgt_state["subdomains"]
+        new_hosts = [
+            host for host in sorted(submap.keys())
+            if host not in httpx_processed and not (submap.get(host) or {}).get("httpx")
+        ]
+        if not flags.get("httpx_done") and not httpx_processed:
+            log(f"=== httpx scan for {domain} ({len(submap)} hosts tracked) ===")
         if not new_hosts:
             if enumerators_done_event.is_set():
                 flags["httpx_done"] = True
                 save_state(state)
                 update_step("httpx", status="completed", message="httpx scan finished.", progress=100)
                 break
-            time.sleep(5)
+            job_sleep(job_domain, 5)
             continue
-        update_step("httpx", status="running", message=f"httpx scanning {len(new_hosts)} new hosts", progress=40)
+        update_step("httpx", status="running", message=f"httpx scanning {len(new_hosts)} pending hosts", progress=40)
         batch_file = write_subdomains_file(domain, new_hosts, suffix="_httpx_batch")
         httpx_json = httpx_scan(batch_file, domain, job_domain=job_domain)
         try:
@@ -1031,24 +1405,32 @@ def run_downstream_pipeline(
             update_step("httpx", status="error", message="httpx batch failed. Check logs for details.", progress=100)
             break
         enrich_state_with_httpx(state, domain, httpx_json)
+        mark_hosts_scanned(state, domain, new_hosts, "httpx")
         httpx_processed.update(new_hosts)
         save_state(state)
         job_log_append(job_domain, f"httpx scanned {len(new_hosts)} hosts.", "httpx")
 
     # ---------- screenshots ----------
-    state = load_state()
-    flags = ensure_target_state(state, domain)["flags"]
     if not config.get("enable_screenshots", True):
+        state = load_state()
+        flags = ensure_target_state(state, domain)["flags"]
         update_step("screenshots", status="skipped", message="Screenshots disabled in settings.", progress=0)
         flags["screenshots_done"] = True
         save_state(state)
     else:
-        screenshot_targets = gather_screenshot_targets(state, domain)
-        if not screenshot_targets:
-            update_step("screenshots", status="skipped", message="No HTTP targets available for screenshots.", progress=0)
-            flags["screenshots_done"] = True
-            save_state(state)
-        else:
+        while True:
+            state = load_state()
+            tgt_state = ensure_target_state(state, domain)
+            flags = tgt_state["flags"]
+            screenshot_targets = gather_screenshot_targets(state, domain)
+            if not screenshot_targets:
+                if enumerators_done_event.is_set():
+                    flags["screenshots_done"] = True
+                    save_state(state)
+                    update_step("screenshots", status="completed", message="Screenshot capture finished.", progress=100)
+                    break
+                job_sleep(job_domain, 5)
+                continue
             update_step("screenshots", status="running", message=f"Capturing screenshots for {len(screenshot_targets)} hosts", progress=40)
             if job_domain:
                 job_log_append(job_domain, "Waiting for screenshot slot...", "scheduler")
@@ -1059,32 +1441,35 @@ def run_downstream_pipeline(
             if not screenshot_map:
                 job_log_append(job_domain, "Screenshot batch failed.", "screenshots")
                 update_step("screenshots", status="error", message="Screenshot capture failed.", progress=100)
-            else:
-                state = load_state()
-                enrich_state_with_screenshots(state, domain, screenshot_map)
-                ensure_target_state(state, domain)["flags"]["screenshots_done"] = True
-                save_state(state)
-                job_log_append(job_domain, f"Captured screenshots for {len(screenshot_map)} hosts.", "screenshots")
-                update_step("screenshots", status="completed", message=f"Screenshots captured for {len(screenshot_map)} hosts.", progress=100)
+                break
+            state = load_state()
+            enrich_state_with_screenshots(state, domain, screenshot_map)
+            save_state(state)
+            job_log_append(job_domain, f"Captured screenshots for {len(screenshot_map)} hosts.", "screenshots")
+            update_step("screenshots", status="running", message=f"Captured {len(screenshot_map)} screenshots. Waiting for new hosts…", progress=75)
 
     # ---------- nuclei ----------
     nuclei_processed: set = set()
     while True:
         state = load_state()
-        flags = ensure_target_state(state, domain)["flags"]
-        all_subs = sorted(ensure_target_state(state, domain)["subdomains"].keys())
-        new_hosts = [s for s in all_subs if s not in nuclei_processed]
-        if not flags.get("nuclei_done") and nuclei_processed == set():
-            log(f"=== nuclei scan for {domain} ({len(all_subs)} hosts) ===")
+        tgt_state = ensure_target_state(state, domain)
+        flags = tgt_state["flags"]
+        submap = tgt_state["subdomains"]
+        new_hosts = [
+            host for host in sorted(submap.keys())
+            if host not in nuclei_processed and not (submap.get(host) or {}).get("scans", {}).get("nuclei")
+        ]
+        if not flags.get("nuclei_done") and not nuclei_processed:
+            log(f"=== nuclei scan for {domain} ({len(submap)} hosts tracked) ===")
         if not new_hosts:
             if enumerators_done_event.is_set():
                 flags["nuclei_done"] = True
                 save_state(state)
                 update_step("nuclei", status="completed", message="nuclei scan finished.", progress=100)
                 break
-            time.sleep(5)
+            job_sleep(job_domain, 5)
             continue
-        update_step("nuclei", status="running", message=f"nuclei scanning {len(new_hosts)} new hosts", progress=40)
+        update_step("nuclei", status="running", message=f"nuclei scanning {len(new_hosts)} pending hosts", progress=40)
         batch_file = write_subdomains_file(domain, new_hosts, suffix="_nuclei_batch")
         if job_domain:
             job_log_append(job_domain, "Waiting for nuclei slot...", "scheduler")
@@ -1103,6 +1488,7 @@ def run_downstream_pipeline(
             update_step("nuclei", status="error", message="nuclei batch failed. Check logs for details.", progress=100)
             break
         enrich_state_with_nuclei(state, domain, nuclei_json)
+        mark_hosts_scanned(state, domain, new_hosts, "nuclei")
         nuclei_processed.update(new_hosts)
         save_state(state)
         job_log_append(job_domain, f"nuclei processed {len(new_hosts)} hosts.", "nuclei")
@@ -1118,20 +1504,24 @@ def run_downstream_pipeline(
     else:
         while True:
             state = load_state()
-            flags = ensure_target_state(state, domain)["flags"]
-            all_subs = sorted(ensure_target_state(state, domain)["subdomains"].keys())
-            new_hosts = [s for s in all_subs if s not in nikto_processed]
-            if not flags.get("nikto_done") and nikto_processed == set():
-                log(f"=== nikto scan for {domain} ({len(all_subs)} hosts) ===")
+            tgt_state = ensure_target_state(state, domain)
+            flags = tgt_state["flags"]
+            submap = tgt_state["subdomains"]
+            new_hosts = [
+                host for host in sorted(submap.keys())
+                if host not in nikto_processed and not (submap.get(host) or {}).get("scans", {}).get("nikto")
+            ]
+            if not flags.get("nikto_done") and not nikto_processed:
+                log(f"=== nikto scan for {domain} ({len(submap)} hosts tracked) ===")
             if not new_hosts:
                 if enumerators_done_event.is_set():
                     flags["nikto_done"] = True
                     save_state(state)
                     update_step("nikto", status="completed", message="Nikto scan finished.", progress=100)
                     break
-                time.sleep(5)
+                job_sleep(job_domain, 5)
                 continue
-            update_step("nikto", status="running", message=f"Nikto scanning {len(new_hosts)} new hosts", progress=40)
+            update_step("nikto", status="running", message=f"Nikto scanning {len(new_hosts)} pending hosts", progress=40)
             if job_domain:
                 job_log_append(job_domain, "Waiting for Nikto slot...", "scheduler")
             with TOOL_GATES["nikto"]:
@@ -1143,6 +1533,7 @@ def run_downstream_pipeline(
                 update_step("nikto", status="error", message="Nikto batch failed. Check logs for details.", progress=100)
                 break
             enrich_state_with_nikto(state, domain, nikto_json)
+            mark_hosts_scanned(state, domain, new_hosts, "nikto")
             nikto_processed.update(new_hosts)
             save_state(state)
             job_log_append(job_domain, f"Nikto scanned {len(new_hosts)} hosts.", "nikto")
@@ -1231,6 +1622,8 @@ def gather_screenshot_targets(state: Dict[str, Any], domain: str) -> List[Tuple[
         httpx_info = info.get("httpx") or {}
         url = httpx_info.get("url")
         if not url:
+            continue
+        if info.get("screenshot"):
             continue
         norm = url.strip()
         if not norm or norm in seen_urls:
@@ -1330,6 +1723,40 @@ def nuclei_scan(subs_file: Path, domain: str, job_domain: Optional[str] = None) 
     return out_json if success and out_json.exists() else None
 
 
+def _normalize_nikto_severity(value: Any, message: Optional[str] = None) -> str:
+    if value is None and message:
+        text = ""
+    elif value is None:
+        text = ""
+    else:
+        text = str(value).strip().lower()
+    message_lower = (message or "").lower()
+    numeric_map = {
+        "0": "INFO",
+        "1": "LOW",
+        "2": "LOW",
+        "3": "MEDIUM",
+        "4": "HIGH",
+        "5": "CRITICAL",
+    }
+    if text in numeric_map:
+        return numeric_map[text]
+    severity_keywords = [
+        ("CRITICAL", ["remote code execution", "rce", "command execution"]),
+        ("HIGH", ["xss", "cross-site scripting", "sql injection", "sqli", "csrf", "directory traversal", "arbitrary file"]),
+        ("MEDIUM", ["security header", "cookie", "uncommon header", "server banner", "outdated", "deprecated", "ssl"]),
+        ("LOW", ["info", "disclosure", "debug"]),
+    ]
+    for level, keywords in severity_keywords:
+        if any(word in text for word in keywords):
+            return level
+        if any(word in message_lower for word in keywords):
+            return level
+    if text:
+        return text.upper()
+    return "INFO"
+
+
 def _parse_nikto_output(host: str, stdout_text: str) -> List[Dict[str, Any]]:
     findings: List[Dict[str, Any]] = []
     if not stdout_text:
@@ -1342,9 +1769,23 @@ def _parse_nikto_output(host: str, stdout_text: str) -> List[Dict[str, Any]]:
         normalized = line.lstrip("+").strip()
         if not normalized or normalized.lower().startswith("0 host"):
             continue
+        lower = normalized.lower()
+        skip_prefixes = (
+            "target ip",
+            "target hostname",
+            "target port",
+            "start time",
+            "end time",
+            "scan terminated",
+            "host(s) tested",
+            "nikto",
+        )
+        if any(lower.startswith(prefix) for prefix in skip_prefixes):
+            continue
         finding: Dict[str, Any] = {
             "host": host,
             "msg": normalized,
+            "severity": _normalize_nikto_severity(None, normalized),
         }
         osvdb_match = re.search(r"OSVDB-(\d+)", normalized, re.IGNORECASE)
         if osvdb_match:
@@ -1391,18 +1832,19 @@ def nikto_scan(subs: List[str], domain: str, job_domain: Optional[str] = None) -
                 job_log_append(job_domain, f"Nikto error for {host}: {e}", source="nikto")
             continue
 
-        if job_domain and proc.stdout:
-            job_log_append(job_domain, proc.stdout, source="nikto")
-        if job_domain and proc.stderr:
-            job_log_append(job_domain, proc.stderr, source="nikto stderr")
+        stdout_text = proc.stdout or ""
+        stderr_text = proc.stderr or ""
+        if job_domain and stdout_text:
+            job_log_append(job_domain, stdout_text, source="nikto")
+        if job_domain and stderr_text:
+            job_log_append(job_domain, stderr_text, source="nikto stderr")
 
-        if proc.returncode != 0:
-            log(f"Nikto failed for {host}: {proc.stderr[:300]}")
-            continue
-
-        host_findings = _parse_nikto_output(host, proc.stdout or "")
+        host_findings = _parse_nikto_output(host, stdout_text)
         if host_findings:
             results.extend(host_findings)
+        if proc.returncode != 0 and not host_findings:
+            log(f"Nikto failed for {host}: {stderr_text[:300]}")
+            continue
 
     try:
         with open(out_json, "w", encoding="utf-8") as f:
@@ -1415,6 +1857,18 @@ def nikto_scan(subs: List[str], domain: str, job_domain: Optional[str] = None) -
 
 
 # ================== STATE ENRICHMENT ==================
+
+
+def make_subdomain_entry() -> Dict[str, Any]:
+    return {
+        "sources": [],
+        "httpx": None,
+        "nuclei": [],
+        "nikto": [],
+        "screenshot": None,
+        "scans": {},
+    }
+
 
 def ensure_target_state(state: Dict[str, Any], domain: str) -> Dict[str, Any]:
     targets = state.setdefault("targets", {})
@@ -1436,9 +1890,20 @@ def ensure_target_state(state: Dict[str, Any], domain: str) -> Dict[str, Any]:
     # Normalize missing keys
     tgt.setdefault("subdomains", {})
     tgt.setdefault("flags", {})
+    tgt.setdefault("options", {})
     for k in ["amass_done", "subfinder_done", "assetfinder_done", "findomain_done", "sublist3r_done",
               "ffuf_done", "httpx_done", "screenshots_done", "nuclei_done", "nikto_done"]:
         tgt["flags"].setdefault(k, False)
+    for sub, entry in list(tgt["subdomains"].items()):
+        if not isinstance(entry, dict):
+            tgt["subdomains"][sub] = make_subdomain_entry()
+            continue
+        entry.setdefault("sources", [])
+        entry.setdefault("httpx", None)
+        entry.setdefault("nuclei", [])
+        entry.setdefault("nikto", [])
+        entry.setdefault("screenshot", None)
+        entry.setdefault("scans", {})
     return tgt
 
 
@@ -1449,16 +1914,10 @@ def add_subdomains_to_state(state: Dict[str, Any], domain: str, subs: List[str],
         s = s.strip().lower()
         if not s:
             continue
-        entry = submap.setdefault(s, {
-            "sources": [],
-            "httpx": None,
-            "nuclei": [],
-            "nikto": [],
-            "screenshot": None,
-        })
-        if "sources" not in entry:
-            entry["sources"] = []
+        entry = submap.setdefault(s, make_subdomain_entry())
+        entry.setdefault("sources", [])
         entry.setdefault("screenshot", None)
+        entry.setdefault("scans", {})
         if source not in entry["sources"]:
             entry["sources"].append(source)
 
@@ -1482,14 +1941,9 @@ def enrich_state_with_httpx(state: Dict[str, Any], domain: str, httpx_json: Path
                 if not host:
                     continue
                 host = host.replace("https://", "").replace("http://", "").split("/")[0].lower()
-                entry = submap.setdefault(host, {
-                    "sources": [],
-                    "httpx": None,
-                    "nuclei": [],
-                    "nikto": [],
-                    "screenshot": None,
-                })
+                entry = submap.setdefault(host, make_subdomain_entry())
                 entry.setdefault("screenshot", None)
+                entry.setdefault("scans", {})
                 entry["httpx"] = {
                     "url": obj.get("url"),
                     "status_code": obj.get("status_code"),
@@ -1521,14 +1975,9 @@ def enrich_state_with_nuclei(state: Dict[str, Any], domain: str, nuclei_json: Pa
                 if not host:
                     continue
                 host = host.replace("https://", "").replace("http://", "").split("/")[0].lower()
-                entry = submap.setdefault(host, {
-                    "sources": [],
-                    "httpx": None,
-                    "nuclei": [],
-                    "nikto": [],
-                    "screenshot": None,
-                })
+                entry = submap.setdefault(host, make_subdomain_entry())
                 entry.setdefault("screenshot", None)
+                entry.setdefault("scans", {})
                 finding = {
                     "template_id": obj.get("template-id"),
                     "name": (obj.get("info") or {}).get("name"),
@@ -1554,14 +2003,9 @@ def enrich_state_with_nikto(state: Dict[str, Any], domain: str, nikto_json: Path
             if not host:
                 continue
             host = str(host).replace("https://", "").replace("http://", "").split("/")[0].lower()
-            entry = submap.setdefault(host, {
-                "sources": [],
-                "httpx": None,
-                "nuclei": [],
-                "nikto": [],
-                "screenshot": None,
-            })
+            entry = submap.setdefault(host, make_subdomain_entry())
             entry.setdefault("screenshot", None)
+            entry.setdefault("scans", {})
             vulns = obj.get("vulnerabilities") or obj.get("vulns")
             if not vulns:
                 vulns = [obj]
@@ -1574,9 +2018,10 @@ def enrich_state_with_nikto(state: Dict[str, Any], domain: str, nikto_json: Path
                         "osvdb": v.get("osvdb"),
                         "risk": v.get("risk"),
                         "uri": v.get("uri"),
+                        "severity": _normalize_nikto_severity(v.get("risk"), v.get("msg") or v.get("description") or v.get("message")),
                     })
                 else:
-                    normalized_vulns.append({"raw": str(v)})
+                    normalized_vulns.append({"raw": str(v), "severity": _normalize_nikto_severity(None, str(v))})
             entry.setdefault("nikto", []).extend(normalized_vulns)
     except Exception as e:
         log(f"Error enriching state with nikto data: {e}")
@@ -1588,14 +2033,51 @@ def enrich_state_with_screenshots(state: Dict[str, Any], domain: str, mapping: D
     tgt = ensure_target_state(state, domain)
     submap = tgt["subdomains"]
     for host, data in mapping.items():
-        entry = submap.setdefault(host, {
-            "sources": [],
-            "httpx": None,
-            "nuclei": [],
-            "nikto": [],
-            "screenshot": None,
-        })
+        entry = submap.setdefault(host, make_subdomain_entry())
+        entry.setdefault("scans", {})
         entry["screenshot"] = data
+
+
+def mark_hosts_scanned(state: Dict[str, Any], domain: str, hosts: List[str], step: str) -> None:
+    if not hosts:
+        return
+    tgt = ensure_target_state(state, domain)
+    submap = tgt["subdomains"]
+    timestamp = datetime.now(timezone.utc).isoformat()
+    for host in hosts:
+        host_norm = (host or "").strip().lower()
+        if not host_norm:
+            continue
+        entry = submap.setdefault(host_norm, make_subdomain_entry())
+        scans = entry.setdefault("scans", {})
+        scans[step] = timestamp
+
+
+def target_has_pending_work(target: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> bool:
+    flags = target.get("flags", {})
+    if any(not bool(value) for value in flags.values()):
+        return True
+    submap = target.get("subdomains", {})
+    enable_screenshots = True if config is None else config.get("enable_screenshots", True)
+    options = target.get("options", {}) or {}
+    skip_nikto = options.get("skip_nikto")
+    if skip_nikto is None and config is not None:
+        skip_nikto = bool(config.get("skip_nikto_by_default", False))
+    else:
+        skip_nikto = bool(skip_nikto)
+    for entry in submap.values():
+        if not isinstance(entry, dict):
+            return True
+        scans = entry.get("scans") or {}
+        if not entry.get("httpx"):
+            return True
+        if enable_screenshots and entry.get("httpx") and not entry.get("screenshot"):
+            return True
+        if not scans.get("nuclei"):
+            return True
+        if not skip_nikto and not scans.get("nikto"):
+            return True
+    return False
 
 
 # ================== DASHBOARD GENERATION ==================
@@ -1762,6 +2244,10 @@ def run_pipeline(
     state = load_state()
     tgt = ensure_target_state(state, domain)
     flags = tgt["flags"]
+    options = tgt.setdefault("options", {})
+    if options.get("skip_nikto") != skip_nikto:
+        options["skip_nikto"] = skip_nikto
+        save_state(state)
 
     enumerators_done_event = threading.Event()
     downstream_started = threading.Event()
@@ -1794,7 +2280,7 @@ def run_pipeline(
         while not enumerators_done_event.is_set():
             harvest_enumerator_outputs(domain, config, seen_cache, job_domain)
             start_downstream_if_ready()
-            time.sleep(30)
+            job_sleep(job_domain, 30)
         harvest_enumerator_outputs(domain, config, seen_cache, job_domain)
         start_downstream_if_ready()
 
@@ -1958,6 +2444,7 @@ def _start_job_thread(job: Dict[str, Any]) -> None:
             with JOB_LOCK:
                 RUNNING_JOBS.pop(domain, None)
             schedule_jobs()
+            cleanup_job_control(domain)
 
     thread = threading.Thread(target=runner, name=f"pipeline-{domain}", daemon=True)
     with JOB_LOCK:
@@ -2065,6 +2552,89 @@ def append_domain_history(domain: str, entry: Dict[str, Any]) -> None:
     except Exception as exc:
         log(f"Failed to write history for {domain}: {exc}")
 
+
+def load_domain_history(domain: str) -> List[Dict[str, Any]]:
+    history_file = HISTORY_DIR / f"{domain}.jsonl"
+    events: List[Dict[str, Any]] = []
+    if not history_file.exists():
+        return events
+    try:
+        with history_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except Exception as exc:
+        raise RuntimeError(f"Failed to read history for {domain}: {exc}") from exc
+    return events
+
+
+def ensure_job_control(domain: Optional[str]) -> Optional[JobControl]:
+    if not domain:
+        return None
+    with JOB_CONTROL_LOCK:
+        ctrl = JOB_CONTROLS.get(domain)
+        if ctrl is None:
+            ctrl = JobControl()
+            JOB_CONTROLS[domain] = ctrl
+        return ctrl
+
+
+def get_job_control(domain: Optional[str]) -> Optional[JobControl]:
+    if not domain:
+        return None
+    with JOB_CONTROL_LOCK:
+        return JOB_CONTROLS.get(domain)
+
+
+def cleanup_job_control(domain: Optional[str]) -> None:
+    if not domain:
+        return
+    with JOB_CONTROL_LOCK:
+        JOB_CONTROLS.pop(domain, None)
+        ACTIVE_PAUSED_JOBS.discard(domain)
+
+
+def job_pause_point(domain: Optional[str]) -> None:
+    if not domain:
+        return
+    ctrl = get_job_control(domain)
+    if not ctrl or not ctrl.is_pause_requested():
+        return
+    should_notify = False
+    with JOB_CONTROL_LOCK:
+        if domain not in ACTIVE_PAUSED_JOBS:
+            ACTIVE_PAUSED_JOBS.add(domain)
+            should_notify = True
+    if should_notify:
+        job_set_status(domain, "paused", "Job paused by user.")
+        job_log_append(domain, "Job paused by user.", "scheduler")
+    ctrl.wait_until_resumed()
+    removed = False
+    with JOB_CONTROL_LOCK:
+        if domain in ACTIVE_PAUSED_JOBS:
+            ACTIVE_PAUSED_JOBS.remove(domain)
+            removed = True
+    if removed:
+        job_set_status(domain, "running", "Job resumed.")
+        job_log_append(domain, "Job resumed by user.", "scheduler")
+
+
+def job_sleep(job_domain: Optional[str], seconds: float, chunk: float = 1.0) -> None:
+    if seconds <= 0:
+        return
+    end_time = time.time() + seconds
+    while True:
+        remaining = end_time - time.time()
+        if remaining <= 0:
+            break
+        job_pause_point(job_domain)
+        time.sleep(min(chunk, max(0.1, remaining)))
+
 INDEX_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2128,6 +2698,7 @@ button:hover { background:#1d4ed8; }
 .progress-inner.status-error, .progress-inner.status-failed { background:#dc2626; }
 .status-pill { display:inline-flex; align-items:center; padding:3px 10px; border-radius:999px; font-size:12px; text-transform:capitalize; border:1px solid transparent; }
 .status-running { background:rgba(37,99,235,0.2); border-color:#2563eb; color:#bfdbfe; }
+.status-paused { background:rgba(250,204,21,0.15); border-color:#facc15; color:#fef3c7; }
 .status-completed { background:rgba(22,163,74,0.2); border-color:#16a34a; color:#bbf7d0; }
 .status-error, .status-failed { background:rgba(239,68,68,0.2); border-color:#ef4444; color:#fecaca; }
 .status-skipped { background:rgba(148,163,184,0.2); border-color:#64748b; color:#e2e8f0; }
@@ -2139,6 +2710,7 @@ button:hover { background:#1d4ed8; }
 .log-entry { margin-bottom:8px; }
 .log-meta { color:var(--muted); font-size:11px; margin-bottom:2px; }
 .log-text { margin:0; white-space:pre-wrap; word-break:break-word; }
+.job-actions { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
 .queue-card { display:flex; flex-direction:column; gap:8px; }
 .queue-row { display:flex; justify-content:space-between; align-items:center; }
 .queue-meta { display:flex; flex-wrap:wrap; gap:12px; font-size:13px; color:var(--muted); }
@@ -2150,6 +2722,7 @@ button:hover { background:#1d4ed8; }
 .worker-progress { margin-top:10px; }
 .btn { display:inline-block; padding:8px 16px; border-radius:8px; background:var(--accent); color:white; font-weight:600; border:none; cursor:pointer; transition:background .2s ease; text-decoration:none; }
 .btn.secondary { background:#1f2937; }
+.btn.small { padding:6px 12px; font-size:13px; }
 .btn:hover { background:#1d4ed8; }
 .export-actions { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
 .targets-table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -2158,6 +2731,65 @@ button:hover { background:#1d4ed8; }
 .reports-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
 .reports-table th, .reports-table td { border:1px solid #1f2937; padding:6px 8px; text-align:left; }
 .reports-table th { background:#162132; }
+.reports-layout { display:grid; grid-template-columns:280px 1fr; gap:20px; align-items:flex-start; }
+.reports-nav { display:flex; flex-direction:column; gap:12px; }
+.report-nav-card { border:1px solid #1f2937; border-radius:12px; padding:14px; background:var(--panel-alt); cursor:pointer; transition:border-color .2s ease, background .2s ease; }
+.report-nav-card .domain-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.report-nav-card .domain { font-weight:600; }
+.report-nav-card .meta { font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:8px; }
+.report-nav-card .stat { font-weight:600; color:#e2e8f0; }
+.report-nav-card .pending { color:#facc15; }
+.report-nav-card.active { border-color:var(--accent); box-shadow:0 0 0 1px rgba(37,99,235,0.4); background:#0b152c; }
+.report-detail { background:var(--panel-alt); border:1px solid #1f2937; border-radius:16px; padding:22px; min-height:300px; }
+.report-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.report-header .report-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.report-stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-top:16px; }
+.report-stat { background:#050b18; border:1px solid #1f2937; border-radius:12px; padding:12px; }
+.report-stat .label { font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:4px; }
+.report-stat .value { font-size:20px; font-weight:600; }
+.report-section { margin-top:24px; }
+.filter-bar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:12px; }
+.filter-group { display:flex; flex-wrap:wrap; gap:8px; }
+.filter-group label { font-size:12px; display:flex; align-items:center; gap:4px; background:#0b152c; padding:4px 8px; border-radius:8px; border:1px solid #1f2937; }
+.filter-group input[type="checkbox"] { accent-color:#2563eb; }
+.report-search { padding:8px 10px; border-radius:8px; border:1px solid #1f2937; background:#050b18; color:var(--text); min-width:200px; }
+.report-badge { display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid transparent; }
+.report-badge.pending { border-color:#facc15; color:#facc15; }
+.report-badge.complete { border-color:#16a34a; color:#86efac; }
+.command-list { list-style:none; margin:0; padding:0; border:1px solid #1f2937; border-radius:12px; background:#050b18; max-height:240px; overflow:auto; }
+.command-item { padding:8px 12px; border-bottom:1px solid #1f2937; font-family:'JetBrains Mono','Fira Code','SFMono-Regular',monospace; font-size:12px; }
+.command-item:last-child { border-bottom:none; }
+.command-time { color:var(--muted); margin-right:8px; }
+.command-text { color:#e2e8f0; word-break:break-all; }
+.severity-pill { display:inline-flex; align-items:center; padding:2px 6px; border-radius:999px; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-right:4px; }
+.severity-pill.CRITICAL { background:rgba(239,68,68,0.2); color:#fecaca; }
+.severity-pill.HIGH { background:rgba(249,115,22,0.2); color:#fed7aa; }
+.severity-pill.MEDIUM { background:rgba(234,179,8,0.2); color:#fde68a; }
+.severity-pill.LOW { background:rgba(34,197,94,0.2); color:#bbf7d0; }
+.severity-pill.INFO { background:rgba(59,130,246,0.2); color:#bfdbfe; }
+.severity-pill.NONE { background:rgba(148,163,184,0.2); color:#e2e8f0; }
+.severity-flag { display:inline-flex; align-items:center; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; border:1px solid transparent; }
+.severity-flag.CRITICAL { background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#fecaca; }
+.severity-flag.HIGH { background:rgba(249,115,22,0.15); border-color:rgba(249,115,22,0.4); color:#fed7aa; }
+.severity-flag.MEDIUM { background:rgba(234,179,8,0.15); border-color:rgba(234,179,8,0.4); color:#fde68a; }
+.severity-flag.LOW { background:rgba(34,197,94,0.15); border-color:rgba(34,197,94,0.4); color:#bbf7d0; }
+.severity-flag.INFO { background:rgba(59,130,246,0.15); border-color:rgba(59,130,246,0.4); color:#bfdbfe; }
+.severity-flag.NONE { background:transparent; border-color:#1f2937; color:#94a3b8; }
+.report-table-note { font-size:12px; color:var(--muted); margin-top:6px; }
+.monitor-list { margin-top:18px; display:flex; flex-direction:column; gap:16px; }
+.monitor-card { border:1px solid #1f2937; border-radius:16px; padding:18px; background:#050b18; }
+.monitor-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.monitor-meta { font-size:13px; color:var(--muted); margin-top:4px; }
+.monitor-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.monitor-stats { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; font-size:13px; }
+.monitor-stats span { background:#0b152c; padding:6px 10px; border-radius:10px; border:1px solid #1f2937; }
+.monitor-entry-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+.monitor-entry-table th, .monitor-entry-table td { border:1px solid #1f2937; padding:6px 8px; text-align:left; }
+.monitor-entry-table th { background:#162132; }
+.monitor-entry-note { font-size:12px; color:var(--muted); margin-top:6px; }
+@media (max-width: 900px) {
+  .reports-layout { grid-template-columns:1fr; }
+}
 .link-btn { background:none; border:none; color:#93c5fd; cursor:pointer; text-decoration:underline; padding:0; font:inherit; }
 .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(2,6,23,0.85); display:none; align-items:center; justify-content:center; z-index:1000; }
 .modal-overlay.show { display:flex; }
@@ -2199,6 +2831,7 @@ button:hover { background:#1d4ed8; }
       <a class="nav-link" data-view="workers" href="#workers">Workers</a>
       <a class="nav-link" data-view="queue" href="#queue">Queue</a>
       <a class="nav-link" data-view="reports" href="#reports">Reports</a>
+      <a class="nav-link" data-view="monitors" href="#monitors">Monitors</a>
       <a class="nav-link" data-view="targets" href="#targets">Targets</a>
       <a class="nav-link" data-view="settings" href="#settings">Settings</a>
     </nav>
@@ -2293,6 +2926,39 @@ button:hover { background:#1d4ed8; }
       </div>
     </section>
 
+    <section class="module" data-view="monitors">
+      <div class="module-header"><h2>Monitors</h2></div>
+      <div class="module-body" id="monitors-body">
+        <div class="grid-two">
+          <div class="card">
+            <h3>Add Monitor</h3>
+            <form id="monitor-form">
+              <label>Name (optional)
+                <input id="monitor-name" type="text" name="name" placeholder="Marketing domains" />
+              </label>
+              <label>Source URL
+                <input id="monitor-url" type="url" name="url" placeholder="https://example.com/domains.txt" required />
+              </label>
+              <label>Check interval (seconds)
+                <input id="monitor-interval" type="number" name="interval" min="60" value="300" />
+              </label>
+              <button type="submit">Add Monitor</button>
+            </form>
+            <div class="status" id="monitor-status"></div>
+          </div>
+          <div class="card">
+            <h3>How it works</h3>
+            <ul class="tips">
+              <li>Provide a newline-delimited list of targets (supports patterns such as <code>example.*</code> or <code>*.apps.example.com</code>).</li>
+              <li>New entries trigger recon jobs automatically with your default settings.</li>
+              <li>Monitors poll in the background; status updates appear below.</li>
+            </ul>
+          </div>
+        </div>
+        <div id="monitors-list" class="monitor-list section-placeholder">No monitors configured yet.</div>
+      </div>
+    </section>
+
     <section class="module" data-view="targets">
       <div class="module-header"><h2>Targets</h2></div>
       <div class="module-body" id="targets-list">
@@ -2313,6 +2979,9 @@ button:hover { background:#1d4ed8; }
               </label>
               <label>Default interval (seconds)
                 <input id="settings-interval" type="number" name="default_interval" min="5" />
+              </label>
+              <label>Wildcard TLDs (comma-separated)
+                <input id="settings-wildcard-tlds" type="text" name="wildcard_tlds" placeholder="com,net,org" />
               </label>
               <label class="checkbox">
                 <input id="settings-skip-nikto" type="checkbox" name="skip_nikto_by_default" />
@@ -2393,6 +3062,11 @@ button:hover { background:#1d4ed8; }
 <script>
 const navLinks = document.querySelectorAll('.nav-link');
 const viewSections = document.querySelectorAll('.module');
+const SEVERITY_SCALE = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'NONE'];
+const SEVERITY_RANK = SEVERITY_SCALE.reduce((acc, label, idx) => {
+  acc[label] = idx;
+  return acc;
+}, {});
 function setView(target) {
   const next = target || 'overview';
   viewSections.forEach(section => section.classList.toggle('active', section.dataset.view === next));
@@ -2420,14 +3094,20 @@ const targetsList = document.getElementById('targets-list');
 const toolsList = document.getElementById('tools-list');
 const workersBody = document.getElementById('workers-body');
 const reportsBody = document.getElementById('reports-body');
+const monitorsList = document.getElementById('monitors-list');
 const detailOverlay = document.getElementById('detail-overlay');
 const detailContent = document.getElementById('detail-content');
 const detailClose = document.getElementById('detail-close');
 let latestTargetsData = {};
 const historyCache = {};
+const commandHistoryCache = {};
+let selectedReportDomain = null;
+let latestRunningJobs = [];
+let latestQueuedJobs = [];
 const settingsForm = document.getElementById('settings-form');
 const settingsWordlist = document.getElementById('settings-wordlist');
 const settingsInterval = document.getElementById('settings-interval');
+const settingsWildcardTlds = document.getElementById('settings-wildcard-tlds');
 const settingsSkipNikto = document.getElementById('settings-skip-nikto');
 const settingsEnableScreenshots = document.getElementById('settings-enable-screenshots');
 const settingsEnableAmass = document.getElementById('settings-enable-amass');
@@ -2446,12 +3126,18 @@ const settingsNikto = document.getElementById('settings-nikto');
 const settingsGowitness = document.getElementById('settings-gowitness');
 const settingsStatus = document.getElementById('settings-status');
 const settingsSummary = document.getElementById('settings-summary');
+const monitorForm = document.getElementById('monitor-form');
+const monitorName = document.getElementById('monitor-name');
+const monitorUrl = document.getElementById('monitor-url');
+const monitorInterval = document.getElementById('monitor-interval');
+const monitorStatus = document.getElementById('monitor-status');
 const statActive = document.getElementById('stat-active');
 const statQueued = document.getElementById('stat-queued');
 const statTargets = document.getElementById('stat-targets');
 const statSubs = document.getElementById('stat-subdomains');
 let launchFormDirty = false;
 let settingsFormDirty = false;
+let monitorsData = [];
 
 const STATUS_LABELS = {
   queued: 'Queued',
@@ -2460,8 +3146,11 @@ const STATUS_LABELS = {
   completed_with_errors: 'Completed w/ warnings',
   failed: 'Failed',
   error: 'Error',
+  dispatched: 'Dispatched',
   skipped: 'Skipped',
-  pending: 'Pending'
+  pending: 'Pending',
+  paused: 'Paused',
+  pausing: 'Pausing'
 };
 
 function statusLabel(value) {
@@ -2479,7 +3168,11 @@ function statusClass(value) {
       return 'status-error';
     case 'running':
     case 'queued':
+    case 'dispatched':
       return 'status-running';
+    case 'paused':
+    case 'pausing':
+      return 'status-paused';
     case 'skipped':
     case 'pending':
     default:
@@ -2504,6 +3197,62 @@ function fmtTime(value) {
   return d.toLocaleString();
 }
 
+function normalizeSeverity(value, fallback = 'INFO') {
+  if (value === undefined || value === null) return fallback;
+  const text = String(value).trim().toUpperCase();
+  if (!text) return fallback;
+  if (SEVERITY_RANK[text] === undefined) return fallback;
+  return text;
+}
+
+function severityRank(value) {
+  const key = value || 'INFO';
+  if (SEVERITY_RANK[key] === undefined) return SEVERITY_RANK.INFO;
+  return SEVERITY_RANK[key];
+}
+
+function severityIsHigher(candidate, current) {
+  return severityRank(candidate) < severityRank(current);
+}
+
+function formatSeverityLabel(value) {
+  if (!value || value === 'NONE') return 'None';
+  return value.charAt(0) + value.slice(1).toLowerCase();
+}
+
+function makeSortable(table) {
+  if (!table) return;
+  const headers = table.querySelectorAll('th[data-sort-key]');
+  headers.forEach((th, index) => {
+    th.addEventListener('click', () => {
+      const nextDir = th.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+      headers.forEach(header => delete header.dataset.sortDir);
+      th.dataset.sortDir = nextDir;
+      const type = th.dataset.sortType || 'text';
+      const multiplier = nextDir === 'asc' ? 1 : -1;
+      const rows = Array.from(table.tBodies[0].rows);
+      rows.sort((a, b) => {
+        const aVal = getCellSortValue(a.cells[index], type);
+        const bVal = getCellSortValue(b.cells[index], type);
+        if (aVal < bVal) return -1 * multiplier;
+        if (aVal > bVal) return 1 * multiplier;
+        return 0;
+      });
+      rows.forEach(row => table.tBodies[0].appendChild(row));
+    });
+  });
+}
+
+function getCellSortValue(cell, type) {
+  if (!cell) return '';
+  const raw = cell.dataset.sortValue !== undefined ? cell.dataset.sortValue : cell.textContent.trim();
+  if (type === 'number') {
+    const num = parseFloat(raw);
+    return isNaN(num) ? 0 : num;
+  }
+  return raw.toLowerCase();
+}
+
 function renderProgress(value, status) {
   const width = Math.max(0, Math.min(100, value || 0));
   return `<div class="progress-bar"><div class="progress-inner ${statusClass(status)}" style="width:${width}%"></div></div>`;
@@ -2522,6 +3271,17 @@ function renderLogEntries(logs) {
       </div>
     `;
   }).join('');
+}
+
+function renderJobControls(job) {
+  if (!job || !job.domain) return '';
+  if (job.status === 'running') {
+    return `<div class="job-actions"><button class="btn secondary small" data-pause-job="${escapeHtml(job.domain)}">Pause</button></div>`;
+  }
+  if (job.status === 'paused' || job.status === 'pausing') {
+    return `<div class="job-actions"><button class="btn small" data-resume-job="${escapeHtml(job.domain)}">Resume</button></div>`;
+  }
+  return '';
 }
 
 function renderJobStep(name, info = {}) {
@@ -2572,6 +3332,7 @@ function renderJobs(jobs) {
           <span><strong>Nikto:</strong> ${job.skip_nikto ? 'Skipped' : 'Enabled'}</span>
         </div>
         <div class="job-message">${escapeHtml(job.message || '')}</div>
+        ${renderJobControls(job)}
         <div class="job-steps">
           ${stepsHtml || '<p class="muted">Awaiting step updates…</p>'}
         </div>
@@ -2803,29 +3564,90 @@ function buildDetailHtml(domain, sub, info, history) {
   `;
 }
 
+function computeReportStats(info) {
+  const subs = Object.values(info && info.subdomains || {});
+  let httpCount = 0;
+  let nucleiCount = 0;
+  let niktoCount = 0;
+  let screenshotCount = 0;
+  let maxSeverity = 'NONE';
+  subs.forEach(entry => {
+    if (entry && entry.httpx) httpCount += 1;
+    nucleiCount += Array.isArray(entry && entry.nuclei) ? entry.nuclei.length : 0;
+    niktoCount += Array.isArray(entry && entry.nikto) ? entry.nikto.length : 0;
+    if (entry && entry.screenshot) screenshotCount += 1;
+    (entry && entry.nuclei || []).forEach(finding => {
+      const sev = normalizeSeverity(finding && finding.severity, 'INFO');
+      if (severityIsHigher(sev, maxSeverity)) {
+        maxSeverity = sev;
+      }
+    });
+    (entry && entry.nikto || []).forEach(finding => {
+      const sev = normalizeSeverity(finding && finding.severity, 'INFO');
+      if (severityIsHigher(sev, maxSeverity)) {
+        maxSeverity = sev;
+      }
+    });
+  });
+  return {
+    subdomains: subs.length,
+    http: httpCount,
+    nuclei: nucleiCount,
+    nikto: niktoCount,
+    screenshots: screenshotCount,
+    maxSeverity,
+  };
+}
+
+function hasActiveJob(domain) {
+  if (!domain) return false;
+  return latestRunningJobs.some(job => job.domain === domain) ||
+    latestQueuedJobs.some(job => job.domain === domain);
+}
+
 function renderReports(targets) {
-  const entries = Object.entries(targets || {});
+  latestTargetsData = targets || {};
+  const entries = Object.entries(latestTargetsData);
   if (!entries.length) {
     reportsBody.innerHTML = '<div class="section-placeholder">No reconnaissance data yet.</div>';
+    selectedReportDomain = null;
     return;
   }
-  const rows = entries.sort((a, b) => b[1]?.subdomains ? Object.keys(b[1].subdomains || {}).length - Object.keys(a[1].subdomains || {}).length : 0).map(([domain, info]) => {
-    const subs = info.subdomains || {};
-    const subKeys = Object.keys(subs);
-    const httpCount = subKeys.filter(key => subs[key]?.httpx).length;
-    const nucleiCount = subKeys.reduce((acc, key) => acc + (Array.isArray(subs[key]?.nuclei) ? subs[key].nuclei.length : 0), 0);
-    const niktoCount = subKeys.reduce((acc, key) => acc + (Array.isArray(subs[key]?.nikto) ? subs[key].nikto.length : 0), 0);
-    const screenshotCount = subKeys.filter(key => subs[key]?.screenshot).length;
+  entries.sort((a, b) => {
+    const aInfo = a[1] || {};
+    const bInfo = b[1] || {};
+    if (!!aInfo.pending !== !!bInfo.pending) {
+      return aInfo.pending ? -1 : 1;
+    }
+    const aSubs = Object.keys(aInfo.subdomains || {}).length;
+    const bSubs = Object.keys(bInfo.subdomains || {}).length;
+    if (aSubs !== bSubs) return bSubs - aSubs;
+    return a[0].localeCompare(b[0]);
+  });
+  if (!selectedReportDomain || !latestTargetsData[selectedReportDomain]) {
+    selectedReportDomain = entries[0][0];
+  }
+  const cards = entries.map(([domain, info]) => {
+    const stats = computeReportStats(info || {});
+    const badge = info && info.pending
+      ? '<span class="report-badge pending">Pending</span>'
+      : '<span class="report-badge complete">Complete</span>';
+    const severity = stats.maxSeverity || 'NONE';
+    const severityText = formatSeverityLabel(severity);
+    const severityFlag = `<span class="severity-flag ${escapeHtml(severity)}">Max: ${escapeHtml(severityText)}</span>`;
     return `
-      <tr>
-        <td>${escapeHtml(domain)}</td>
-        <td>${subKeys.length}</td>
-        <td>${httpCount}</td>
-        <td>${nucleiCount}</td>
-        <td>${niktoCount}</td>
-        <td>${screenshotCount}</td>
-        <td><button class="btn secondary" data-target-domain="${escapeHtml(domain)}">Open</button></td>
-      </tr>
+      <div class="report-nav-card" data-report-domain="${escapeHtml(domain)}">
+        <div class="domain-row">
+          <div class="domain">${escapeHtml(domain)}</div>
+          ${severityFlag}
+        </div>
+        <div class="meta">
+          <span>Subs <span class="stat">${stats.subdomains}</span></span>
+          <span>HTTP <span class="stat">${stats.http}</span></span>
+          <span>Findings <span class="stat">${stats.nuclei + stats.nikto}</span></span>
+        </div>
+        ${badge}
+      </div>
     `;
   }).join('');
   reportsBody.innerHTML = `
@@ -2833,35 +3655,589 @@ function renderReports(targets) {
       <a class="btn" href="/api/export/state" target="_blank">Download JSON</a>
       <a class="btn secondary" href="/api/export/csv" target="_blank">Download CSV</a>
     </div>
-    <div class="table-wrapper">
-      <table class="reports-table">
-        <thead>
-          <tr>
-            <th>Domain</th>
-            <th>Subdomains</th>
-            <th>HTTP entries</th>
-            <th>Nuclei findings</th>
-            <th>Nikto findings</th>
-            <th>Screenshots</th>
-            <th>Detail</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
+    <div class="reports-layout">
+      <div class="reports-nav" id="reports-nav">${cards}</div>
+      <div class="report-detail" id="report-detail"></div>
     </div>
   `;
+  renderReportDetail(selectedReportDomain);
+}
+
+function monitorStatusClass(value) {
+  switch (value) {
+    case 'ok':
+      return 'status-completed';
+    case 'error':
+      return 'status-error';
+    case 'pending':
+      return 'status-running';
+    default:
+      return 'status-skipped';
+  }
+}
+
+function monitorStatusLabel(value) {
+  if (!value) return 'Unknown';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function renderMonitorEntries(entries) {
+  if (!entries || !entries.length) {
+    return '<tr><td colspan="5">No entries observed yet.</td></tr>';
+  }
+  return entries.map(entry => {
+    const targets = (entry.dispatched_targets || []).join(', ') || '—';
+    const status = entry.status || 'pending';
+    return `
+      <tr>
+        <td>${escapeHtml(entry.value || '')}</td>
+        <td>${escapeHtml(targets)}</td>
+        <td><span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span></td>
+        <td>${fmtTime(entry.last_seen)}</td>
+        <td>${escapeHtml(entry.dispatch_message || '—')}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderMonitors(monitors) {
+  if (!monitorsList) return;
+  monitorsData = Array.isArray(monitors) ? monitors : [];
+  if (!monitorsData.length) {
+    monitorsList.innerHTML = '<div class="section-placeholder">No monitors configured yet.</div>';
+    return;
+  }
+  const cards = monitorsData.map(monitor => {
+    const entries = Array.isArray(monitor.entries) ? monitor.entries : [];
+    const entryRows = renderMonitorEntries(entries);
+    const truncatedNote = monitor.entries_truncated ? '<p class="monitor-entry-note">Showing most recent entries.</p>' : '';
+    const statusClassName = monitorStatusClass(monitor.last_status);
+    const statusText = monitorStatusLabel(monitor.last_status);
+    const errorMessage = monitor.last_error ? `<p class="status error">${escapeHtml(monitor.last_error)}</p>` : '';
+    const nextCheck = monitor.next_check ? fmtTime(monitor.next_check) : 'Scheduled';
+    return `
+      <div class="monitor-card" data-monitor-id="${escapeHtml(monitor.id || '')}">
+        <div class="monitor-header">
+          <div>
+            <h3>${escapeHtml(monitor.name || monitor.url || 'Monitor')}</h3>
+            <div class="monitor-meta">
+              <a href="${escapeHtml(monitor.url || '#')}" target="_blank">${escapeHtml(monitor.url || '')}</a><br>
+              Interval: ${escapeHtml(monitor.interval || 0)}s · Last check: ${fmtTime(monitor.last_checked)} · Next check: ${nextCheck}
+            </div>
+          </div>
+          <div class="monitor-actions">
+            <span class="status-pill ${statusClassName}">${statusText}</span>
+            <button class="btn secondary small" data-remove-monitor="${escapeHtml(monitor.id || '')}">Remove</button>
+          </div>
+        </div>
+        <div class="monitor-stats">
+          <span>Entries: ${escapeHtml(monitor.entry_count || 0)}</span>
+          <span>Pending: ${escapeHtml(monitor.pending_entries || 0)}</span>
+          <span>Last new: ${escapeHtml(monitor.last_new_entries || 0)}</span>
+          <span>Last dispatched: ${escapeHtml(monitor.last_dispatch_count || 0)}</span>
+        </div>
+        ${errorMessage}
+        <div class="table-wrapper">
+          <table class="monitor-entry-table">
+            <thead>
+              <tr>
+                <th>Value</th>
+                <th>Targets</th>
+                <th>Status</th>
+                <th>Last seen</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>${entryRows}</tbody>
+          </table>
+        </div>
+        ${truncatedNote}
+      </div>
+    `;
+  }).join('');
+  monitorsList.innerHTML = cards;
+}
+
+async function deleteMonitor(id, button) {
+  if (!id) return;
+  const original = button ? button.textContent : null;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Removing…';
+  }
+  try {
+    const resp = await fetch('/api/monitors/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await resp.json();
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to remove monitor.');
+    }
+    if (monitorStatus) {
+      monitorStatus.textContent = data.message || 'Monitor removed.';
+      monitorStatus.className = 'status success';
+    }
+    fetchState();
+  } catch (err) {
+    if (monitorStatus) {
+      monitorStatus.textContent = err.message || 'Failed to remove monitor.';
+      monitorStatus.className = 'status error';
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  }
+}
+
+function updateReportNavSelection() {
+  const nav = document.getElementById('reports-nav');
+  if (!nav) return;
+  nav.querySelectorAll('.report-nav-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.reportDomain === selectedReportDomain);
+  });
+}
+
+function buildSubdomainRows(info) {
+  const subs = info.subdomains || {};
+  const hosts = Object.keys(subs).sort();
+  return hosts.map(host => {
+    const entry = subs[host] || {};
+    const httpx = entry.httpx || {};
+    const statusCode = httpx.status_code !== undefined && httpx.status_code !== null ? String(httpx.status_code) : '';
+    return {
+      host,
+      sources: entry.sources || [],
+      statusCode,
+      title: httpx.title || '',
+      server: httpx.webserver || '',
+      screenshot: entry.screenshot,
+      nucleiCount: Array.isArray(entry.nuclei) ? entry.nuclei.length : 0,
+      niktoCount: Array.isArray(entry.nikto) ? entry.nikto.length : 0,
+      url: httpx.url || '',
+    };
+  });
+}
+
+function buildStatusFilterOptions(rows) {
+  const statuses = new Set();
+  rows.forEach(row => statuses.add(row.statusCode || 'none'));
+  return Array.from(statuses).sort((a, b) => {
+    if (a === 'none') return 1;
+    if (b === 'none') return -1;
+    return Number(a) - Number(b);
+  });
+}
+
+function buildNucleiRows(info) {
+  const rows = [];
+  const subs = info.subdomains || {};
+  Object.entries(subs).forEach(([host, entry]) => {
+    (entry.nuclei || []).forEach(finding => {
+      const severity = normalizeSeverity(finding && finding.severity, 'INFO');
+      rows.push({
+        host,
+        severity,
+        template: finding.template_id || finding["template-id"] || 'N/A',
+        name: finding.name || '',
+        location: finding.matched_at || finding["matched-at"] || finding.url || '',
+      });
+    });
+  });
+  return rows;
+}
+
+function buildNiktoRows(info) {
+  const rows = [];
+  const subs = info.subdomains || {};
+  Object.entries(subs).forEach(([host, entry]) => {
+    (entry.nikto || []).forEach(finding => {
+      const severity = normalizeSeverity((finding && (finding.severity || finding.risk)) || 'INFO', 'INFO');
+      rows.push({
+        host,
+        severity,
+        message: finding.msg || finding.description || finding.raw || '',
+        reference: finding.uri || (finding.osvdb ? `OSVDB-${finding.osvdb}` : ''),
+      });
+    });
+  });
+  return rows;
+}
+
+function renderReportDetail(domain) {
+  const detail = document.getElementById('report-detail');
+  if (!detail) return;
+  const info = latestTargetsData[domain];
+  if (!info) {
+    detail.innerHTML = '<div class="section-placeholder">Select a program to view its report.</div>';
+    return;
+  }
+  selectedReportDomain = domain;
+  const stats = computeReportStats(info);
+  const badge = info.pending
+    ? '<span class="report-badge pending">Pending</span>'
+    : '<span class="report-badge complete">Complete</span>';
+  const maxSeverity = stats.maxSeverity || 'NONE';
+  const maxSeverityText = formatSeverityLabel(maxSeverity);
+  const maxSeverityFlag = `<span class="severity-flag ${escapeHtml(maxSeverity)}">Max: ${escapeHtml(maxSeverityText)}</span>`;
+  const activeJob = hasActiveJob(domain);
+  const canResume = info.pending && !activeJob;
+  const resumeButton = canResume ? `<button class="btn small" data-resume-target="${escapeHtml(domain)}">Resume Scan</button>` : '';
+  const resumeNotice = info.pending && activeJob ? '<span class="muted">Scan already active for this program.</span>' : '';
+  const subRows = buildSubdomainRows(info);
+  const statusOptions = buildStatusFilterOptions(subRows);
+  const statusFilters = statusOptions.length
+    ? statusOptions.map(code => {
+        const label = code === 'none' ? 'No status' : code;
+        return `<label><input type="checkbox" value="${escapeHtml(code)}" checked />${escapeHtml(label)}</label>`;
+      }).join('')
+    : '<span class="muted">No HTTP data yet.</span>';
+  const subTableRows = subRows.length
+    ? subRows.map(row => {
+        const statusCode = row.statusCode || '';
+        const screenshotLink = row.screenshot && row.screenshot.path
+          ? `<a href="/screenshots/${escapeHtml(row.screenshot.path)}" target="_blank">View</a>`
+          : '—';
+        return `
+          <tr data-status-code="${statusCode || 'none'}" data-host="${escapeHtml(row.host.toLowerCase())}" data-title="${escapeHtml((row.title || '').toLowerCase())}">
+            <td data-sort-value="${escapeHtml(row.host)}"><button class="link-btn sub-link" data-domain="${escapeHtml(domain)}" data-sub="${escapeHtml(row.host)}">${escapeHtml(row.host)}</button></td>
+            <td data-sort-value="${statusCode || '0'}">${statusCode || '—'}</td>
+            <td data-sort-value="${escapeHtml((row.title || '').toLowerCase())}">${escapeHtml(row.title || '—')}</td>
+            <td data-sort-value="${escapeHtml((row.server || '').toLowerCase())}">${escapeHtml(row.server || '—')}</td>
+            <td data-sort-value="${row.screenshot ? '1' : '0'}">${screenshotLink}</td>
+            <td data-sort-value="${row.nucleiCount}">${row.nucleiCount ? `${row.nucleiCount} findings` : '—'}</td>
+            <td data-sort-value="${row.niktoCount}">${row.niktoCount ? `${row.niktoCount} findings` : '—'}</td>
+            <td data-sort-value="${escapeHtml((row.sources || []).join(', ').toLowerCase())}">${escapeHtml((row.sources || []).join(', ')) || '—'}</td>
+          </tr>
+        `;
+      }).join('')
+    : '<tr><td colspan="8">No subdomains collected yet.</td></tr>';
+  const nucleiRows = buildNucleiRows(info);
+  const nucleiSeverities = Array.from(new Set(nucleiRows.map(row => row.severity))).sort();
+  const nucleiFilters = nucleiSeverities.length
+    ? nucleiSeverities.map(sev => `<label><input type="checkbox" value="${escapeHtml(sev)}" checked />${escapeHtml(sev)}</label>`).join('')
+    : '';
+  const nucleiTableRows = nucleiRows.length
+    ? nucleiRows.map(row => `
+        <tr data-severity="${escapeHtml(row.severity)}">
+          <td data-sort-value="${escapeHtml(row.severity)}"><span class="severity-pill ${escapeHtml(row.severity)}">${escapeHtml(row.severity)}</span></td>
+          <td data-sort-value="${escapeHtml(row.host.toLowerCase())}">${escapeHtml(row.host)}</td>
+          <td data-sort-value="${escapeHtml((row.template || '').toLowerCase())}">${escapeHtml(row.template || 'N/A')}</td>
+          <td data-sort-value="${escapeHtml((row.name || '').toLowerCase())}">${escapeHtml(row.name || '—')}</td>
+          <td data-sort-value="${escapeHtml((row.location || '').toLowerCase())}">${escapeHtml(row.location || '—')}</td>
+        </tr>
+      `).join('')
+    : '';
+  const niktoRows = buildNiktoRows(info);
+  const niktoSeverities = Array.from(new Set(niktoRows.map(row => row.severity))).sort();
+  const niktoFilters = niktoSeverities.length
+    ? niktoSeverities.map(sev => `<label><input type="checkbox" value="${escapeHtml(sev)}" checked />${escapeHtml(sev)}</label>`).join('')
+    : '';
+  const niktoTableRows = niktoRows.length
+    ? niktoRows.map(row => `
+        <tr data-severity="${escapeHtml(row.severity)}">
+          <td data-sort-value="${escapeHtml(row.severity)}"><span class="severity-pill ${escapeHtml(row.severity)}">${escapeHtml(row.severity)}</span></td>
+          <td data-sort-value="${escapeHtml(row.host.toLowerCase())}">${escapeHtml(row.host)}</td>
+          <td data-sort-value="${escapeHtml((row.message || '').toLowerCase())}">${escapeHtml(row.message || '—')}</td>
+          <td data-sort-value="${escapeHtml((row.reference || '').toLowerCase())}">${escapeHtml(row.reference || '—')}</td>
+        </tr>
+      `).join('')
+    : '';
+  detail.innerHTML = `
+    <div class="report-header">
+      <div>
+        <h3>${escapeHtml(domain)}</h3>
+        ${badge}
+      </div>
+      <div class="report-actions">
+        ${resumeButton}
+        ${resumeNotice}
+      </div>
+    </div>
+    <div class="report-stats-grid">
+      <div class="report-stat">
+        <div class="label">Subdomains</div>
+        <div class="value">${stats.subdomains}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">HTTP entries</div>
+        <div class="value">${stats.http}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Nuclei findings</div>
+        <div class="value">${stats.nuclei}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Nikto findings</div>
+        <div class="value">${stats.nikto}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Screenshots</div>
+        <div class="value">${stats.screenshots}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Max severity</div>
+        <div class="value">${maxSeverityFlag}</div>
+      </div>
+    </div>
+    <div class="report-section">
+      <h4>Subdomains</h4>
+      <div class="filter-bar">
+        <div class="filter-group" data-status-filter>
+          ${statusFilters}
+        </div>
+        <input type="search" class="report-search" placeholder="Search subdomains…" data-sub-search />
+      </div>
+      <div class="table-wrapper">
+        <table class="targets-table" id="subdomains-table">
+          <thead>
+            <tr>
+              <th data-sort-key="host">Subdomain</th>
+              <th data-sort-key="status" data-sort-type="number">Status</th>
+              <th data-sort-key="title">Title</th>
+              <th data-sort-key="server">Server</th>
+              <th data-sort-key="screenshot" data-sort-type="number">Screenshot</th>
+              <th data-sort-key="nuclei" data-sort-type="number">Nuclei</th>
+              <th data-sort-key="nikto" data-sort-type="number">Nikto</th>
+              <th data-sort-key="sources">Sources</th>
+            </tr>
+          </thead>
+          <tbody>${subTableRows}</tbody>
+        </table>
+      </div>
+      <p class="report-table-note">Click a subdomain to explore its detailed timeline.</p>
+    </div>
+    <div class="report-section">
+      <h4>Nuclei Findings</h4>
+      ${nucleiRows.length ? `<div class="filter-bar" data-nuclei-filter><div class="filter-group">${nucleiFilters}</div></div>` : ''}
+      ${nucleiRows.length ? `
+        <div class="table-wrapper">
+          <table class="targets-table" id="nuclei-table">
+            <thead>
+              <tr>
+                <th data-sort-key="severity">Severity</th>
+                <th data-sort-key="host">Host</th>
+                <th data-sort-key="template">Template</th>
+                <th data-sort-key="name">Name</th>
+                <th data-sort-key="location">Matched</th>
+              </tr>
+            </thead>
+            <tbody>${nucleiTableRows}</tbody>
+          </table>
+        </div>` : '<p class="muted">No nuclei findings recorded.</p>'}
+    </div>
+    <div class="report-section">
+      <h4>Nikto Findings</h4>
+      ${niktoRows.length ? `<div class="filter-bar" data-nikto-filter><div class="filter-group">${niktoFilters}</div></div>` : ''}
+      ${niktoRows.length ? `
+        <div class="table-wrapper">
+          <table class="targets-table" id="nikto-table">
+            <thead>
+              <tr>
+                <th data-sort-key="severity">Severity</th>
+                <th data-sort-key="host">Host</th>
+                <th data-sort-key="message">Message</th>
+                <th data-sort-key="reference">Reference</th>
+              </tr>
+            </thead>
+            <tbody>${niktoTableRows}</tbody>
+          </table>
+        </div>` : '<p class="muted">No Nikto findings recorded.</p>'}
+    </div>
+    <div class="report-section">
+      <h4>Command History</h4>
+      <div data-command-log data-command-domain="${escapeHtml(domain)}">
+        <p class="muted">Loading command history…</p>
+      </div>
+    </div>
+  `;
+  makeSortable(detail.querySelector('#subdomains-table'));
+  makeSortable(detail.querySelector('#nuclei-table'));
+  makeSortable(detail.querySelector('#nikto-table'));
+  attachSubdomainFilters(detail);
+  attachSeverityFilter(detail.querySelector('[data-nuclei-filter]'), detail.querySelector('#nuclei-table'));
+  attachSeverityFilter(detail.querySelector('[data-nikto-filter]'), detail.querySelector('#nikto-table'));
+  hydrateCommandLog(domain);
+  updateReportNavSelection();
+}
+
+function attachSubdomainFilters(detailEl) {
+  const table = detailEl.querySelector('#subdomains-table');
+  if (!table) return;
+  const statusGroup = detailEl.querySelector('[data-status-filter]');
+  const searchInput = detailEl.querySelector('[data-sub-search]');
+  const apply = () => {
+    const activeStatuses = statusGroup
+      ? Array.from(statusGroup.querySelectorAll('input[type="checkbox"]'))
+          .filter(input => input.checked)
+          .map(input => input.value)
+      : [];
+    const allowed = activeStatuses.length ? new Set(activeStatuses) : null;
+    const query = (searchInput && searchInput.value || '').trim().toLowerCase();
+    const rows = table.tBodies[0] ? Array.from(table.tBodies[0].rows) : [];
+    rows.forEach(row => {
+      const status = row.dataset.statusCode || 'none';
+      const host = row.dataset.host || '';
+      const title = row.dataset.title || '';
+      const matchesStatus = !allowed || allowed.has(status);
+      const matchesSearch = !query || host.includes(query) || title.includes(query);
+      row.style.display = matchesStatus && matchesSearch ? '' : 'none';
+    });
+  };
+  if (statusGroup) {
+    statusGroup.querySelectorAll('input[type="checkbox"]').forEach(input => input.addEventListener('change', apply));
+  }
+  if (searchInput) {
+    searchInput.addEventListener('input', apply);
+  }
+  apply();
+}
+
+function attachSeverityFilter(wrapper, table) {
+  if (!wrapper || !table) return;
+  const checkboxes = wrapper.querySelectorAll('input[type="checkbox"]');
+  if (!checkboxes.length) return;
+  const apply = () => {
+    const allowed = new Set(Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value));
+    const rows = table.tBodies[0] ? Array.from(table.tBodies[0].rows) : [];
+    rows.forEach(row => {
+      const sev = row.dataset.severity || 'INFO';
+      row.style.display = allowed.has(sev) ? '' : 'none';
+    });
+  };
+  checkboxes.forEach(cb => cb.addEventListener('change', apply));
+  apply();
+}
+
+async function fetchCommandHistory(domain) {
+  if (commandHistoryCache[domain]) {
+    return commandHistoryCache[domain];
+  }
+  try {
+    const resp = await fetch(`/api/history/commands?domain=${encodeURIComponent(domain)}&limit=400`);
+    if (!resp.ok) throw new Error('Failed to fetch commands');
+    const data = await resp.json();
+    const commands = Array.isArray(data.commands) ? data.commands : [];
+    commandHistoryCache[domain] = commands;
+    return commands;
+  } catch (err) {
+    return [];
+  }
+}
+
+async function hydrateCommandLog(domain) {
+  const container = document.querySelector('[data-command-log]');
+  if (!container) return;
+  const targetDomain = container.getAttribute('data-command-domain');
+  if (targetDomain !== domain) return;
+  container.innerHTML = '<p class="muted">Loading command history…</p>';
+  const commands = await fetchCommandHistory(domain);
+  if (container.getAttribute('data-command-domain') !== domain) {
+    return;
+  }
+  if (!commands.length) {
+    container.innerHTML = '<p class="muted">No commands recorded yet.</p>';
+    return;
+  }
+  const items = commands.map(entry => `
+    <li class="command-item">
+      <span class="command-time">${escapeHtml(entry.ts || '')}</span>
+      <span class="command-text">${escapeHtml(entry.text || '')}</span>
+    </li>
+  `).join('');
+  container.innerHTML = `<ul class="command-list">${items}</ul>`;
+}
+
+async function handleResumeTarget(domain, button) {
+  if (!domain || !button) return;
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Resuming…';
+  try {
+    const resp = await fetch('/api/targets/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain }),
+    });
+    const data = await resp.json();
+    button.textContent = data.message || original;
+    if (data.success) {
+      fetchState();
+    }
+  } catch (err) {
+    button.textContent = err.message || 'Failed';
+  } finally {
+    setTimeout(() => {
+      button.textContent = original;
+      button.disabled = false;
+    }, 2000);
+  }
+}
+
+async function handleJobControl(action, domain, button) {
+  if (!domain || !button) return;
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = action === 'pause' ? 'Pausing…' : 'Resuming…';
+  try {
+    const resp = await fetch(`/api/jobs/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain }),
+    });
+    const data = await resp.json();
+    button.textContent = data.message || original;
+    if (data.success) {
+      fetchState();
+    }
+  } catch (err) {
+    button.textContent = err.message || 'Failed';
+  } finally {
+    setTimeout(() => {
+      button.textContent = original;
+      button.disabled = false;
+    }, 2000);
+  }
 }
 
 reportsBody.addEventListener('click', (event) => {
-  const btn = event.target.closest('[data-target-domain]');
-  if (!btn) return;
-  const domain = btn.getAttribute('data-target-domain');
-  setView('targets');
-  const card = document.querySelector(`#targets-list .target-card[data-domain="${CSS.escape(domain)}"]`);
+  const subBtn = event.target.closest('.sub-link');
+  if (subBtn) {
+    event.preventDefault();
+    const domain = subBtn.getAttribute('data-domain');
+    const sub = subBtn.getAttribute('data-sub');
+    openSubdomainDetail(domain, sub);
+    return;
+  }
+  const resumeBtn = event.target.closest('[data-resume-target]');
+  if (resumeBtn) {
+    const domain = resumeBtn.getAttribute('data-resume-target');
+    handleResumeTarget(domain, resumeBtn);
+    return;
+  }
+  const card = event.target.closest('.report-nav-card');
   if (card) {
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    card.classList.add('highlight');
-    setTimeout(() => card.classList.remove('highlight'), 2000);
+    const domain = card.getAttribute('data-report-domain');
+    if (domain) {
+      renderReportDetail(domain);
+    }
+  }
+});
+
+jobsList.addEventListener('click', (event) => {
+  const pauseBtn = event.target.closest('[data-pause-job]');
+  if (pauseBtn) {
+    const domain = pauseBtn.getAttribute('data-pause-job');
+    handleJobControl('pause', domain, pauseBtn);
+    return;
+  }
+  const resumeBtn = event.target.closest('[data-resume-job]');
+  if (resumeBtn) {
+    const domain = resumeBtn.getAttribute('data-resume-job');
+    handleJobControl('resume', domain, resumeBtn);
   }
 });
 function renderSettings(config, tools) {
@@ -2899,6 +4275,7 @@ function renderSettings(config, tools) {
   if (!settingsFormDirty) {
     settingsWordlist.value = config.default_wordlist || '';
     settingsInterval.value = config.default_interval || 30;
+    settingsWildcardTlds.value = (config.wildcard_tlds || []).join(', ');
     settingsSkipNikto.checked = !!config.skip_nikto_by_default;
     settingsEnableScreenshots.checked = config.enable_screenshots !== false;
     settingsEnableAmass.checked = config.enable_amass !== false;
@@ -2929,6 +4306,8 @@ async function fetchState() {
     const resp = await fetch('/api/state');
     if (!resp.ok) throw new Error('Failed to fetch state');
     const data = await resp.json();
+    latestRunningJobs = data.running_jobs || [];
+    latestQueuedJobs = data.queued_jobs || [];
     document.getElementById('last-updated').textContent = 'Last updated: ' + (data.last_updated || 'never');
     renderJobs(data.running_jobs || []);
     renderQueue(data.queued_jobs || []);
@@ -2936,6 +4315,7 @@ async function fetchState() {
     renderSettings(data.config || {}, data.tools || {});
     renderWorkers(data.workers || {});
     renderReports(data.targets || {});
+    renderMonitors(data.monitors || []);
   } catch (err) {
     targetsList.innerHTML = `<div class="section-placeholder">${escapeHtml(err.message)}</div>`;
   }
@@ -2993,6 +4373,7 @@ settingsForm.addEventListener('submit', async (event) => {
   const payload = {
     default_wordlist: settingsWordlist.value,
     default_interval: settingsInterval.value,
+    wildcard_tlds: settingsWildcardTlds.value,
     skip_nikto_by_default: settingsSkipNikto.checked,
     enable_screenshots: settingsEnableScreenshots.checked,
     enable_amass: settingsEnableAmass.checked,
@@ -3030,6 +4411,52 @@ settingsForm.addEventListener('submit', async (event) => {
     settingsStatus.className = 'status error';
   }
 });
+
+if (monitorForm) {
+  monitorForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = {
+      name: monitorName ? monitorName.value : '',
+      url: monitorUrl ? monitorUrl.value : '',
+      interval: monitorInterval ? monitorInterval.value : '',
+    };
+    if (monitorStatus) {
+      monitorStatus.textContent = 'Saving...';
+      monitorStatus.className = 'status';
+    }
+    try {
+      const resp = await fetch('/api/monitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (monitorStatus) {
+        monitorStatus.textContent = data.message || 'Saved';
+        monitorStatus.className = 'status ' + (data.success ? 'success' : 'error');
+      }
+      if (data.success) {
+        monitorForm.reset();
+        fetchState();
+      }
+    } catch (err) {
+      if (monitorStatus) {
+        monitorStatus.textContent = err.message;
+        monitorStatus.className = 'status error';
+      }
+    }
+  });
+}
+
+if (monitorsList) {
+  monitorsList.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-monitor]');
+    if (removeBtn) {
+      const id = removeBtn.getAttribute('data-remove-monitor');
+      deleteMonitor(id, removeBtn);
+    }
+  });
+}
 
 fetchState();
 setInterval(fetchState, POLL_INTERVAL);
@@ -3117,6 +4544,110 @@ def build_targets_csv(state: Dict[str, Any]) -> bytes:
     return output.getvalue().encode("utf-8")
 
 
+def pause_job(domain: str) -> Tuple[bool, str]:
+    normalized = (domain or "").strip().lower()
+    if not normalized:
+        return False, "Domain is required."
+    with JOB_LOCK:
+        job = RUNNING_JOBS.get(normalized)
+        if not job:
+            return False, f"No active job for {normalized}."
+        thread = job.get("thread")
+    if not thread or not thread.is_alive():
+        return False, f"Job thread for {normalized} is not running."
+    ctrl = ensure_job_control(normalized)
+    if not ctrl.request_pause():
+        return False, f"{normalized} is already paused."
+    job_set_status(normalized, "pausing", "Pause requested; waiting for pipeline to acknowledge.")
+    job_log_append(normalized, "Pause requested by user.", "scheduler")
+    return True, f"{normalized} will pause momentarily."
+
+
+def resume_job(domain: str) -> Tuple[bool, str]:
+    normalized = (domain or "").strip().lower()
+    if not normalized:
+        return False, "Domain is required."
+    with JOB_LOCK:
+        job = RUNNING_JOBS.get(normalized)
+        if not job:
+            return False, f"No active job for {normalized}."
+        thread = job.get("thread")
+    if not thread or not thread.is_alive():
+        return False, f"Job thread for {normalized} is not running."
+    ctrl = get_job_control(normalized)
+    if not ctrl:
+        return False, f"{normalized} is not currently paused."
+    if not ctrl.request_resume():
+        return False, f"{normalized} is not paused."
+    job_set_status(normalized, "running", "Resume requested by user.")
+    job_log_append(normalized, "Resume requested by user.", "scheduler")
+    return True, f"{normalized} resumed."
+
+
+def resume_target_scan(domain: str, wordlist: Optional[str] = None,
+                       skip_nikto: Optional[bool] = None) -> Tuple[bool, str]:
+    normalized = (domain or "").strip().lower()
+    if not normalized:
+        return False, "Domain is required."
+    cfg = get_config()
+    state = load_state()
+    target = state.get("targets", {}).get(normalized)
+    if not target:
+        return False, f"No stored reconnaissance data for {normalized}."
+    if not target_has_pending_work(target, cfg):
+        return False, f"{normalized} already completed all steps."
+    options = target.get("options") or {}
+    if skip_nikto is None:
+        if "skip_nikto" in options:
+            skip_flag = bool(options.get("skip_nikto"))
+        else:
+            skip_flag = bool(cfg.get("skip_nikto_by_default", False))
+    else:
+        skip_flag = bool(skip_nikto)
+    wordlist_val = None
+    if wordlist:
+        cleaned = str(wordlist).strip()
+        if cleaned:
+            wordlist_val = cleaned
+    return start_pipeline_job(normalized, wordlist_val, skip_flag, None)
+
+
+def start_targets_from_input(domain_input: str, wordlist: Optional[str],
+                             skip_nikto: bool, interval: Optional[int]) -> Tuple[bool, str, List[Dict[str, Any]]]:
+    cfg = get_config()
+    cleaned = _sanitize_domain_input(domain_input)
+    requested_any_tld = bool(cleaned.endswith(".*"))
+    targets = expand_wildcard_targets(domain_input, cfg)
+    if not targets:
+        if requested_any_tld:
+            return False, "Wildcard TLD requested but no TLDs are configured. Update wildcard TLDs in Settings.", []
+        return False, "Domain is required.", []
+    details: List[Dict[str, Any]] = []
+    success_any = False
+    for target in targets:
+        success, message = start_pipeline_job(target, wordlist, skip_nikto, interval)
+        if success:
+            success_any = True
+        details.append({
+            "target": target,
+            "success": success,
+            "message": message,
+        })
+    if len(details) == 1:
+        result = details[0]
+        return result["success"], result["message"], details
+    summary_parts: List[str] = []
+    dispatched = [entry["target"] for entry in details if entry["success"]]
+    if dispatched:
+        summary_parts.append(f"Dispatched {len(dispatched)} job(s): {', '.join(dispatched)}.")
+    failures = [entry["message"] for entry in details if not entry["success"]]
+    if failures:
+        summary_parts.append(" ".join(failures))
+    if not summary_parts:
+        summary_parts.append("No jobs were dispatched.")
+    return success_any, " ".join(summary_parts).strip(), details
+
+
 def start_pipeline_job(domain: str, wordlist: Optional[str], skip_nikto: bool, interval: Optional[int]) -> Tuple[bool, str]:
     normalized = (domain or "").strip().lower()
     if not normalized:
@@ -3150,6 +4681,7 @@ def start_pipeline_job(domain: str, wordlist: Optional[str], skip_nikto: bool, i
             "logs": [],
         }
         RUNNING_JOBS[normalized] = job_record
+        ensure_job_control(normalized)
         if count_active_jobs_locked() < MAX_RUNNING_JOBS:
             start_now = True
         else:
@@ -3167,15 +4699,22 @@ def start_pipeline_job(domain: str, wordlist: Optional[str], skip_nikto: bool, i
 def build_state_payload() -> Dict[str, Any]:
     state = load_state()
     config = get_config()
+    targets = state.get("targets", {})
+    for info in targets.values():
+        try:
+            info["pending"] = target_has_pending_work(info, config)
+        except Exception:
+            info["pending"] = True
     tool_info = {name: shutil.which(cmd) or "" for name, cmd in TOOLS.items()}
     return {
         "last_updated": state.get("last_updated"),
-        "targets": state.get("targets", {}),
+        "targets": targets,
         "running_jobs": snapshot_running_jobs(),
         "queued_jobs": job_queue_snapshot(),
         "config": config,
         "tools": tool_info,
         "workers": snapshot_workers(),
+        "monitors": list_monitors(),
     }
 
 
@@ -3203,6 +4742,9 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
         if self.path == "/api/settings":
             self._send_json({"config": get_config()})
             return
+        if self.path == "/api/monitors":
+            self._send_json({"monitors": list_monitors()})
+            return
         if self.path.startswith("/screenshots/"):
             rel_path = unquote(self.path[len("/screenshots/"):]).lstrip("/")
             if not rel_path:
@@ -3223,6 +4765,30 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             data = requested.read_bytes()
             self._send_bytes(data, status=HTTPStatus.OK, content_type=mime or "application/octet-stream")
             return
+        if self.path.startswith("/api/history/commands"):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            domain = (params.get("domain") or [""])[0].strip().lower()
+            if not domain:
+                self._send_json({"success": False, "message": "domain parameter required"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            limit_param = params.get("limit")
+            limit = 200
+            if limit_param:
+                try:
+                    limit = max(1, min(2000, int(limit_param[0])))
+                except (TypeError, ValueError):
+                    limit = 200
+            try:
+                events = load_domain_history(domain)
+            except RuntimeError as exc:
+                self._send_json({"success": False, "message": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
+            commands = [evt for evt in events if str(evt.get("text", "")).lstrip().startswith("$")]
+            payload = {"domain": domain, "commands": commands[-limit:]}
+            self._send_json(payload)
+            return
+
         if self.path.startswith("/api/history"):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
@@ -3230,22 +4796,11 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             if not domain:
                 self._send_json({"success": False, "message": "domain parameter required"}, status=HTTPStatus.BAD_REQUEST)
                 return
-            history_file = HISTORY_DIR / f"{domain}.jsonl"
-            events = []
-            if history_file.exists():
-                try:
-                    with history_file.open("r", encoding="utf-8") as f:
-                        for line in f:
-                            line = line.strip()
-                            if not line:
-                                continue
-                            try:
-                                events.append(json.loads(line))
-                            except json.JSONDecodeError:
-                                continue
-                except Exception as exc:
-                    self._send_json({"success": False, "message": f"Failed to read history: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-                    return
+            try:
+                events = load_domain_history(domain)
+            except RuntimeError as exc:
+                self._send_json({"success": False, "message": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
             self._send_json({"domain": domain, "events": events[-1000:]})
             return
         if self.path == "/api/export/state":
@@ -3269,7 +4824,16 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
 
     def do_POST(self):
-        if self.path not in {"/api/run", "/api/settings"}:
+        allowed = {
+            "/api/run",
+            "/api/settings",
+            "/api/jobs/pause",
+            "/api/jobs/resume",
+            "/api/targets/resume",
+            "/api/monitors",
+            "/api/monitors/delete",
+        }
+        if self.path not in allowed:
             self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
             return
 
@@ -3287,6 +4851,32 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             self._send_json({"success": False, "message": "Invalid JSON payload."}, status=HTTPStatus.BAD_REQUEST)
             return
 
+        if self.path == "/api/jobs/pause":
+            domain = payload.get("domain", "")
+            success, message = pause_job(domain)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message}, status=status)
+            return
+
+        if self.path == "/api/jobs/resume":
+            domain = payload.get("domain", "")
+            success, message = resume_job(domain)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message}, status=status)
+            return
+
+        if self.path == "/api/targets/resume":
+            domain = payload.get("domain", "")
+            skip_value = payload.get("skip_nikto")
+            skip_flag = None
+            if skip_value is not None and skip_value != "":
+                skip_flag = bool_from_value(skip_value, False)
+            wordlist = payload.get("wordlist")
+            success, message = resume_target_scan(domain, wordlist=wordlist, skip_nikto=skip_flag)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message}, status=status)
+            return
+
         if self.path == "/api/run":
             domain = payload.get("domain", "")
             wordlist = payload.get("wordlist")
@@ -3300,7 +4890,23 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             skip_default = get_config().get("skip_nikto_by_default", False)
             skip_nikto = bool_from_value(payload.get("skip_nikto"), skip_default)
 
-            success, message = start_pipeline_job(domain, wordlist, skip_nikto, interval_int)
+            success, message, _ = start_targets_from_input(domain, wordlist, skip_nikto, interval_int)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message}, status=status)
+            return
+
+        if self.path == "/api/monitors":
+            name = payload.get("name", "")
+            url = payload.get("url", "")
+            interval = payload.get("interval")
+            success, message, monitor = add_monitor(name, url, interval)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message, "monitor": monitor}, status=status)
+            return
+
+        if self.path == "/api/monitors/delete":
+            monitor_id = payload.get("id") or payload.get("monitor_id") or ""
+            success, message = remove_monitor(monitor_id)
             status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
             self._send_json({"success": success, "message": message}, status=status)
             return
@@ -3319,6 +4925,7 @@ def run_server(host: str, port: int, interval: int) -> None:
     refresh = interval or config.get("default_interval", DEFAULT_INTERVAL)
     HTML_REFRESH_SECONDS = max(5, refresh)
     ensure_dirs()
+    start_monitor_worker()
     generate_html_dashboard()
     server = ThreadingHTTPServer((host, port), CommandCenterHandler)
     log(f"Recon Command Center available at http://{host}:{port}")
@@ -3371,13 +4978,24 @@ def main():
     ensure_required_tools()
 
     if args.domain:
-        log(f"Running single pipeline execution for {args.domain}.")
-        try:
-            run_pipeline(args.domain, args.wordlist, skip_nikto=args.skip_nikto, interval=args.interval)
-        except KeyboardInterrupt:
-            log("Interrupted by user.")
-        except Exception as e:
-            log(f"Fatal error: {e}")
+        cfg = get_config()
+        targets = expand_wildcard_targets(args.domain, cfg)
+        if not targets:
+            cleaned = _sanitize_domain_input(args.domain)
+            if cleaned.endswith(".*"):
+                log("Wildcard TLD requested but no TLDs are configured. Update wildcard settings in the web UI.")
+            else:
+                log("No valid targets resolved from input.")
+            return
+        for target in targets:
+            log(f"Running single pipeline execution for {target}.")
+            try:
+                run_pipeline(target, args.wordlist, skip_nikto=args.skip_nikto, interval=args.interval)
+            except KeyboardInterrupt:
+                log("Interrupted by user.")
+                return
+            except Exception as e:
+                log(f"Fatal error while processing {target}: {e}")
         return
 
     log("Launching Recon Command Center web server.")

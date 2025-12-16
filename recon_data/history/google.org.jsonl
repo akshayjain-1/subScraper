@@ -1,0 +1,94 @@
+{"ts": "2025-12-16T10:16:00.286758+00:00", "source": "scheduler", "text": "Queued for execution."}
+{"ts": "2025-12-16T10:21:21.293769+00:00", "source": "RUNNING", "text": "Recon started."}
+{"ts": "2025-12-16T10:21:21.313176+00:00", "source": "scheduler", "text": "Job dispatched to worker."}
+{"ts": "2025-12-16T10:21:22.312265+00:00", "source": "amass", "text": "[amass] Amass in progress\u2026"}
+{"ts": "2025-12-16T10:21:22.326472+00:00", "source": "amass", "text": "$ /opt/homebrew/bin/amass enum -d google.org -oA recon_data/amass_google.org"}
+{"ts": "2025-12-16T10:21:22.339268+00:00", "source": "subfinder", "text": "[subfinder] Subfinder in progress\u2026"}
+{"ts": "2025-12-16T10:21:22.339918+00:00", "source": "subfinder", "text": "$ /opt/homebrew/bin/subfinder -silent -d google.org -t 32 -o recon_data/subfinder_google.org.txt"}
+{"ts": "2025-12-16T10:21:22.351115+00:00", "source": "assetfinder", "text": "[assetfinder] Assetfinder in progress\u2026"}
+{"ts": "2025-12-16T10:21:22.355787+00:00", "source": "assetfinder", "text": "$ /Users/wesleythijs/go/bin/assetfinder --subs-only google.org"}
+{"ts": "2025-12-16T10:21:22.361794+00:00", "source": "findomain", "text": "[findomain] Findomain in progress\u2026"}
+{"ts": "2025-12-16T10:21:22.363696+00:00", "source": "findomain", "text": "$ /opt/homebrew/bin/findomain --target google.org --threads 40 --quiet --output recon_data/findomain_google.org.txt"}
+{"ts": "2025-12-16T10:21:22.372290+00:00", "source": "sublist3r", "text": "[sublist3r] Sublist3r in progress\u2026"}
+{"ts": "2025-12-16T10:21:22.382546+00:00", "source": "FINDOMAIN stderr", "text": "error: unexpected argument 'recon_data/findomain_google.org.txt' found"}
+{"ts": "2025-12-16T10:21:22.382546+00:00", "source": "FINDOMAIN stderr", "text": "Usage: findomain [OPTIONS]"}
+{"ts": "2025-12-16T10:21:22.382546+00:00", "source": "FINDOMAIN stderr", "text": "For more information, try '--help'."}
+{"ts": "2025-12-16T10:31:22.389366+00:00", "source": "amass", "text": "Error: Command '['/opt/homebrew/bin/amass', 'enum', '-d', 'google.org', '-oA', 'recon_data/amass_google.org']' timed out after 600 seconds"}
+{"ts": "2025-12-16T10:31:23.822352+00:00", "source": "amass", "text": "Amass identified 0 subdomains."}
+{"ts": "2025-12-16T10:31:23.845361+00:00", "source": "amass", "text": "[amass] Amass found 0 subdomains."}
+{"ts": "2025-12-16T10:31:27.078150+00:00", "source": "subfinder", "text": "Subfinder identified 0 subdomains."}
+{"ts": "2025-12-16T10:31:27.078381+00:00", "source": "subfinder", "text": "[subfinder] Subfinder found 0 subdomains."}
+{"ts": "2025-12-16T10:31:27.734276+00:00", "source": "assetfinder", "text": "Assetfinder identified 0 subdomains."}
+{"ts": "2025-12-16T10:31:27.734750+00:00", "source": "assetfinder", "text": "[assetfinder] Assetfinder found 0 subdomains."}
+{"ts": "2025-12-16T10:31:28.565979+00:00", "source": "findomain", "text": "Findomain identified 0 subdomains."}
+{"ts": "2025-12-16T10:31:28.566244+00:00", "source": "findomain", "text": "[findomain] Findomain found 0 subdomains."}
+{"ts": "2025-12-16T10:31:28.863173+00:00", "source": "sublist3r", "text": "Sublist3r identified 0 subdomains."}
+{"ts": "2025-12-16T10:31:28.863366+00:00", "source": "sublist3r", "text": "[sublist3r] Sublist3r found 0 subdomains."}
+{"ts": "2025-12-16T10:31:56.596999+00:00", "source": "ffuf", "text": "[ffuf] Wordlist missing; ffuf skipped."}
+{"ts": "2025-12-16T10:32:01.761739+00:00", "source": "httpx", "text": "[httpx] httpx scan finished."}
+{"ts": "2025-12-16T10:32:02.324827+00:00", "source": "screenshots", "text": "[screenshots] Screenshot capture finished."}
+{"ts": "2025-12-16T10:32:02.710411+00:00", "source": "nuclei", "text": "[nuclei] nuclei scan finished."}
+{"ts": "2025-12-16T10:32:03.193711+00:00", "source": "nikto", "text": "[nikto] Nikto scan finished."}
+{"ts": "2025-12-16T10:32:03.202501+00:00", "source": "COMPLETED", "text": "Recon finished successfully."}
+{"ts": "2025-12-16T15:10:45.998843+00:00", "source": "scheduler", "text": "Job dispatched to worker."}
+{"ts": "2025-12-16T15:10:45.998825+00:00", "source": "RUNNING", "text": "Recon started."}
+{"ts": "2025-12-16T15:10:46.106606+00:00", "source": "amass", "text": "[amass] Amass in progress\u2026"}
+{"ts": "2025-12-16T15:10:46.487614+00:00", "source": "subfinder", "text": "[subfinder] Subfinder in progress\u2026"}
+{"ts": "2025-12-16T15:10:46.490463+00:00", "source": "amass", "text": "$ /opt/homebrew/bin/amass enum -d google.org -oA recon_data/amass_google.org"}
+{"ts": "2025-12-16T15:10:46.529943+00:00", "source": "assetfinder", "text": "[assetfinder] Assetfinder in progress\u2026"}
+{"ts": "2025-12-16T15:10:46.529802+00:00", "source": "subfinder", "text": "$ /opt/homebrew/bin/subfinder -silent -d google.org -t 32 -o recon_data/subfinder_google.org.txt"}
+{"ts": "2025-12-16T15:10:46.553791+00:00", "source": "findomain", "text": "[findomain] Findomain in progress\u2026"}
+{"ts": "2025-12-16T15:10:46.553547+00:00", "source": "assetfinder", "text": "$ /Users/wesleythijs/go/bin/assetfinder --subs-only google.org"}
+{"ts": "2025-12-16T15:10:46.574962+00:00", "source": "findomain", "text": "$ /opt/homebrew/bin/findomain --target google.org --threads 40 --quiet --output recon_data/findomain_google.org.txt"}
+{"ts": "2025-12-16T15:10:46.567505+00:00", "source": "sublist3r", "text": "[sublist3r] Sublist3r in progress\u2026"}
+{"ts": "2025-12-16T15:10:46.670956+00:00", "source": "FINDOMAIN stderr", "text": "error: unexpected argument 'recon_data/findomain_google.org.txt' found"}
+{"ts": "2025-12-16T15:10:46.670956+00:00", "source": "FINDOMAIN stderr", "text": "Usage: findomain [OPTIONS]"}
+{"ts": "2025-12-16T15:10:46.670956+00:00", "source": "FINDOMAIN stderr", "text": "For more information, try '--help'."}
+{"ts": "2025-12-16T15:11:06.093305+00:00", "source": "subfinder", "text": "personfinder.google.org"}
+{"ts": "2025-12-16T15:11:06.093305+00:00", "source": "subfinder", "text": "ww.google.org"}
+{"ts": "2025-12-16T15:11:06.093305+00:00", "source": "subfinder", "text": "www.google.org"}
+{"ts": "2025-12-16T15:11:16.527925+00:00", "source": "subfinder", "text": "subfinder added 3 new subdomains."}
+{"ts": "2025-12-16T15:11:16.801657+00:00", "source": "ffuf", "text": "[ffuf] Wordlist missing; ffuf skipped."}
+{"ts": "2025-12-16T15:11:17.052953+00:00", "source": "httpx", "text": "[httpx] httpx scanning 3 pending hosts"}
+{"ts": "2025-12-16T15:11:17.169258+00:00", "source": "httpx", "text": "$ /Users/wesleythijs/go/bin/httpx -l recon_data/subs_google.org_httpx_batch.txt -json -o recon_data/httpx_google.org.json -timeout 10 -follow-redirects -v"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "    __    __  __       _  __"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "   / /_  / /_/ /_____ | |/ /"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "  / __ \\/ __/ __/ __ \\|   /"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": " / / / / /_/ /_/ /_/ /   |"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "/_/ /_/\\__/\\__/ .___/_/|_|"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "             /_/"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "\t\tprojectdiscovery.io"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "[\u001b[31mERR\u001b[0m] httpx version check failed: cause=\"context deadline exceeded (Client.Timeout exceeded while awaiting headers)\" chain=\"http Get https://api.pdtm.sh/api/v1/tools/httpx?arch=arm64&go_version=go1.24.4&machine_id=564dca4cfadd4ebb627aa540f224c6f7890fd687798bd9b93d9cc204d257f7d1&os=darwin&utm_source=unknown&v=v1.7.4 failed\""}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "[\u001b[93mWRN\u001b[0m] UI Dashboard is disabled, Use -dashboard option to enable"}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "[\u001b[35mDBG\u001b[0m] Failed 'http://ww.google.org': Get \"http://ww.google.org\": cause=\"no address found for host\""}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "[\u001b[35mDBG\u001b[0m] Failed 'http://www.google.org': Get \"http://www.google.org\": cause=\"no address found for host\""}
+{"ts": "2025-12-16T15:11:32.614344+00:00", "source": "HTTPX stderr", "text": "[\u001b[35mDBG\u001b[0m] Failed 'http://personfinder.google.org': Get \"http://personfinder.google.org\": cause=\"no address found for host\""}
+{"ts": "2025-12-16T15:11:32.818639+00:00", "source": "httpx", "text": "httpx scanned 3 hosts."}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "www.google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "cscriachi.bvolxtcem8ipb166.2013-uttrakhand-floods.personfinder.google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "personfinder.google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "blog.google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "2013-uttrakhand-floods.personfinder.google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "ww.google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "google.org"}
+{"ts": "2025-12-16T15:11:40.250301+00:00", "source": "assetfinder", "text": "*.personfinder.google.org"}
+{"ts": "2025-12-16T15:11:47.176889+00:00", "source": "assetfinder", "text": "assetfinder added 10 new subdomains."}
+{"ts": "2025-12-16T15:11:47.950518+00:00", "source": "httpx", "text": "[httpx] httpx scanning 5 pending hosts"}
+{"ts": "2025-12-16T15:11:48.057480+00:00", "source": "httpx", "text": "$ /Users/wesleythijs/go/bin/httpx -l recon_data/subs_google.org_httpx_batch.txt -json -o recon_data/httpx_google.org.json -timeout 10 -follow-redirects -v"}
+{"ts": "2025-12-16T15:11:55.888104+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-16T16:11:53.183739+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://cscriachi.bvolxtcem8ipb166.2013-uttrakhand-floods.personfinder.google.org\",\"input\":\"cscriachi.bvolxtcem8ipb166.2013-uttrakhand-floods.personfinder.google.org\",\"title\":\"Google Person Finder\",\"scheme\":\"https\",\"webserver\":\"Google Frontend\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"cscriachi.bvolxtcem8ipb166.2013-uttrakhand-floods.personfinder.google.org\",\"host_ip\":\"2001:4860:4802"}
+{"ts": "2025-12-16T15:11:55.888104+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-16T16:11:54.163631+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://personfinder.google.org\",\"input\":\"*.personfinder.google.org\",\"title\":\"Google Person Finder\",\"scheme\":\"https\",\"webserver\":\"Google Frontend\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"personfinder.google.org\",\"host_ip\":\"216.239.32.27\",\"path\":\"/\",\"time\":\"3.280485417s\",\"a\":[\"216.239.32.27\"],\"aaaa\":[\"2001:4860:4802:32::1b\"],\"tech\":[\"Google Cloud\",\"Google Cloud Load Balancing\",\"Googl"}
+{"ts": "2025-12-16T15:11:55.888104+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-16T16:11:54.518418+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://google.org\",\"input\":\"google.org\",\"title\":\"Google.org: Google's philanthropy\",\"scheme\":\"https\",\"webserver\":\"sffe\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"google.org\",\"host_ip\":\"2001:4860:4802:32::1b\",\"path\":\"/\",\"final_url\":\"https://www.google.org/\",\"time\":\"3.375117834s\",\"chain_status_codes\":[302,200],\"a\":[\"216.239.32.27\"],\"aaaa\":[\"2001:4860:4802:32::1b\"],\"tech\":[\"Google Tag M"}
+{"ts": "2025-12-16T15:11:55.888104+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-16T16:11:54.932754+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"80\",\"url\":\"http://blog.google.org\",\"input\":\"blog.google.org\",\"title\":\"Official google.org Blog\",\"scheme\":\"http\",\"webserver\":\"GSE\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"blog.google.org\",\"host_ip\":\"64.233.166.121\",\"path\":\"/\",\"time\":\"3.348661125s\",\"a\":[\"64.233.166.121\"],\"aaaa\":[\"2a00:1450:400c:c0c::79\"],\"cname\":[\"ghs.google.com\"],\"tech\":[\"Blogger\",\"Java\",\"OpenGSE\",\"Python\"],\"words\":9958,\"lines\":"}
+{"ts": "2025-12-16T15:11:55.888104+00:00", "source": "httpx", "text": "{\"timestamp\":\"2025-12-16T16:11:55.880087+01:00\",\"cdn_name\":\"google\",\"cdn_type\":\"cdn\",\"port\":\"443\",\"url\":\"https://2013-uttrakhand-floods.personfinder.google.org\",\"input\":\"2013-uttrakhand-floods.personfinder.google.org\",\"title\":\"Google Person Finder\",\"scheme\":\"https\",\"webserver\":\"Google Frontend\",\"content_type\":\"text/html\",\"method\":\"GET\",\"host\":\"2013-uttrakhand-floods.personfinder.google.org\",\"host_ip\":\"2001:4860:4802:32::1b\",\"path\":\"/\",\"time\":\"4.991358958s\",\"a\":[\"216.239.32.27\"],\"aaaa\":[\"2001:486"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "    __    __  __       _  __"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "   / /_  / /_/ /_____ | |/ /"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "  / __ \\/ __/ __/ __ \\|   /"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": " / / / / /_/ /_/ /_/ /   |"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "/_/ /_/\\__/\\__/ .___/_/|_|"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "             /_/"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "\t\tprojectdiscovery.io"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "[\u001b[34mINF\u001b[0m] Current httpx version v1.7.4 (\u001b[92mlatest\u001b[0m)"}
+{"ts": "2025-12-16T15:11:55.888867+00:00", "source": "HTTPX stderr", "text": "[\u001b[93mWRN\u001b[0m] UI Dashboard is disabled, Use -dashboard option to enable"}
+{"ts": "2025-12-16T15:11:56.089643+00:00", "source": "httpx", "text": "httpx scanned 5 hosts."}

@@ -1381,3 +1381,240 @@
 {"ts": "2025-12-16T08:02:41.404252+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
 {"ts": "2025-12-16T08:02:41.405011+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'datamarket.mitsubishi-fuso.com'"}
 {"ts": "2025-12-16T08:02:41.405130+00:00", "source": "nikto", "text": "Nikto scanning http://dev-econsultingtool.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ Target IP:          4.189.193.71"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ Target Hostname:    dev-econsultingtool.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ Target Port:        80"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ Start Time:         2025-12-16 09:02:42 (GMT1)"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ Server: No banner retrieved"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ The anti-clickjacking X-Frame-Options header is not present."}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ The X-XSS-Protection header is not defined. This header can hint to the user agent to protect against some forms of XSS"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ Root page / redirects to: https://dev-econsultingtool.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ No CGI Directories found (use '-C all' to force check all possible dirs)"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ 7499 requests: 0 error(s) and 3 item(s) reported on remote host"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ End Time:           2025-12-16 09:33:31 (GMT1) (1849 seconds)"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:33:31.720509+00:00", "source": "nikto", "text": "+ 1 host(s) tested"}
+{"ts": "2025-12-16T08:33:31.725630+00:00", "source": "nikto", "text": "Nikto scanning http://dev-econsutlingtool.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:33:32.138229+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:33:32.138229+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:33:32.138229+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:33:32.138980+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'dev-econsutlingtool.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T08:33:32.139101+00:00", "source": "nikto", "text": "Nikto scanning http://dev-tdp-saml.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:33:32.488932+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:33:32.488932+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:33:32.488932+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:33:32.490931+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'dev-tdp-saml.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T08:33:32.491179+00:00", "source": "nikto", "text": "Nikto scanning http://digitalfuso.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:34:52.980195+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:34:52.980195+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:34:52.980195+00:00", "source": "nikto", "text": "+ No web server found on digitalfuso.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:34:52.980195+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:34:52.980195+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:34:52.981358+00:00", "source": "nikto", "text": "Nikto scanning http://digitalfusoev.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:36:13.443742+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:36:13.443742+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:36:13.443742+00:00", "source": "nikto", "text": "+ No web server found on digitalfusoev.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:36:13.443742+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:36:13.443742+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:36:13.444937+00:00", "source": "nikto", "text": "Nikto scanning http://domesticsales.i.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:36:13.785922+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:36:13.785922+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:36:13.785922+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:36:13.787718+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'domesticsales.i.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T08:36:13.787908+00:00", "source": "nikto", "text": "Nikto scanning http://domesticsales.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:37:34.292846+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:37:34.292846+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:37:34.292846+00:00", "source": "nikto", "text": "+ No web server found on domesticsales.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:37:34.292846+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:37:34.292846+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:37:34.300844+00:00", "source": "nikto", "text": "Nikto scanning http://dta-apps-dev.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:38:55.520973+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:38:55.520973+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:38:55.520973+00:00", "source": "nikto", "text": "+ No web server found on dta-apps-dev.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:38:55.520973+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:38:55.520973+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:38:55.522835+00:00", "source": "nikto", "text": "Nikto scanning http://dta-apps-qa.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:40:16.057161+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:40:16.057161+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:40:16.057161+00:00", "source": "nikto", "text": "+ No web server found on dta-apps-qa.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:40:16.057161+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:40:16.057161+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:40:16.059089+00:00", "source": "nikto", "text": "Nikto scanning http://dta-apps.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:41:36.594027+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:41:36.594027+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:41:36.594027+00:00", "source": "nikto", "text": "+ No web server found on dta-apps.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:41:36.594027+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:41:36.594027+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:41:36.596206+00:00", "source": "nikto", "text": "Nikto scanning http://ecanterar.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:41:37.035795+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:41:37.035795+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:41:37.035795+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:41:37.037207+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'ecanterar.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T08:41:37.037485+00:00", "source": "nikto", "text": "Nikto scanning http://ecommunity-dev.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:42:57.518957+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:42:57.518957+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:42:57.518957+00:00", "source": "nikto", "text": "+ No web server found on ecommunity-dev.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:42:57.518957+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:42:57.518957+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:42:57.520534+00:00", "source": "nikto", "text": "Nikto scanning http://ecommunity-qa.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:44:18.067683+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:44:18.067683+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:44:18.067683+00:00", "source": "nikto", "text": "+ No web server found on ecommunity-qa.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:44:18.067683+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:44:18.067683+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:44:18.068630+00:00", "source": "nikto", "text": "Nikto scanning http://ecommunity.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T08:45:38.540344+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T08:45:38.540344+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:45:38.540344+00:00", "source": "nikto", "text": "+ No web server found on ecommunity.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T08:45:38.540344+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T08:45:38.540344+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T08:45:38.542211+00:00", "source": "nikto", "text": "Nikto scanning http://econsultingtool.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ Target IP:          4.190.2.171"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ Target Hostname:    econsultingtool.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ Target Port:        80"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ Start Time:         2025-12-16 09:45:39 (GMT1)"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ Server: No banner retrieved"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ The anti-clickjacking X-Frame-Options header is not present."}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ The X-XSS-Protection header is not defined. This header can hint to the user agent to protect against some forms of XSS"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ Root page / redirects to: https://econsultingtool.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ No CGI Directories found (use '-C all' to force check all possible dirs)"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ 7499 requests: 0 error(s) and 3 item(s) reported on remote host"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ End Time:           2025-12-16 10:16:18 (GMT1) (1839 seconds)"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:16:19.009956+00:00", "source": "nikto", "text": "+ 1 host(s) tested"}
+{"ts": "2025-12-16T09:16:19.013337+00:00", "source": "nikto", "text": "Nikto scanning http://eol-test.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:16:19.353336+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:16:19.353336+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:16:19.353336+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:16:19.355288+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'eol-test.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T09:16:19.355603+00:00", "source": "nikto", "text": "Nikto scanning http://eol.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:17:39.709399+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:17:39.709399+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:17:39.709399+00:00", "source": "nikto", "text": "+ No web server found on eol.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:17:39.709399+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:17:39.709399+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:17:39.710836+00:00", "source": "nikto", "text": "Nikto scanning http://epa-ascent.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:19:00.131844+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:19:00.131844+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:19:00.131844+00:00", "source": "nikto", "text": "+ No web server found on epa-ascent.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:19:00.131844+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:19:00.131844+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:19:00.133131+00:00", "source": "nikto", "text": "Nikto scanning http://erecruit.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:19:00.402884+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:19:00.402884+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:19:00.402884+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:19:00.404211+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'erecruit.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T09:19:00.404391+00:00", "source": "nikto", "text": "Nikto scanning http://extranet-dealer.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:20:20.712794+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:20:20.712794+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:20:20.712794+00:00", "source": "nikto", "text": "+ No web server found on extranet-dealer.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:20:20.712794+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:20:20.712794+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:20:20.714071+00:00", "source": "nikto", "text": "Nikto scanning http://extranet-dev-dealer.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:21:41.070454+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:21:41.070454+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:21:41.070454+00:00", "source": "nikto", "text": "+ No web server found on extranet-dev-dealer.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:21:41.070454+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:21:41.070454+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:21:41.071934+00:00", "source": "nikto", "text": "Nikto scanning http://extranet-dev.dealer.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:21:41.338790+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:21:41.338790+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:21:41.338790+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:21:41.339553+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'extranet-dev.dealer.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T09:21:41.339738+00:00", "source": "nikto", "text": "Nikto scanning http://extranet.dealer.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:21:41.598158+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:21:41.598158+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:21:41.598158+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:21:41.599128+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'extranet.dealer.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T09:21:41.599254+00:00", "source": "nikto", "text": "Nikto scanning http://extranet.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:21:41.838470+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:21:41.838470+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:21:41.838470+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:21:41.839751+00:00", "source": "nikto stderr", "text": "+ ERROR: Cannot resolve hostname 'extranet.mitsubishi-fuso.com'"}
+{"ts": "2025-12-16T09:21:41.839889+00:00", "source": "nikto", "text": "Nikto scanning http://falcon-webservice.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:23:02.140988+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:23:02.140988+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:23:02.140988+00:00", "source": "nikto", "text": "+ No web server found on falcon-webservice.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:23:02.140988+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:23:02.140988+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:23:02.142099+00:00", "source": "nikto", "text": "Nikto scanning http://falcon.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:24:22.457713+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:24:22.457713+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:24:22.457713+00:00", "source": "nikto", "text": "+ No web server found on falcon.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:24:22.457713+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:24:22.457713+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:24:22.458714+00:00", "source": "nikto", "text": "Nikto scanning http://feedback.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ Target IP:          20.18.237.148"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ Target Hostname:    feedback.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ Target Port:        80"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ Start Time:         2025-12-16 10:24:23 (GMT1)"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ Server: Microsoft-Azure-Application-Gateway/v2"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ The anti-clickjacking X-Frame-Options header is not present."}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ The X-XSS-Protection header is not defined. This header can hint to the user agent to protect against some forms of XSS"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ Root page / redirects to: https://feedback.mitsubishi-fuso.com/"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ No CGI Directories found (use '-C all' to force check all possible dirs)"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ 7499 requests: 0 error(s) and 3 item(s) reported on remote host"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ End Time:           2025-12-16 10:55:27 (GMT1) (1864 seconds)"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:55:27.062191+00:00", "source": "nikto", "text": "+ 1 host(s) tested"}
+{"ts": "2025-12-16T09:55:27.064391+00:00", "source": "nikto", "text": "Nikto scanning http://ffp-test.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:56:47.633763+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:56:47.633763+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:56:47.633763+00:00", "source": "nikto", "text": "+ No web server found on ffp-test.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:56:47.633763+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:56:47.633763+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:56:47.638680+00:00", "source": "nikto", "text": "Nikto scanning http://ffp.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:58:08.041638+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:58:08.041638+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:58:08.041638+00:00", "source": "nikto", "text": "+ No web server found on ffp.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:58:08.041638+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:58:08.041638+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:58:08.042898+00:00", "source": "nikto", "text": "Nikto scanning http://force-aomori.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T09:59:28.415085+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T09:59:28.415085+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:59:28.415085+00:00", "source": "nikto", "text": "+ No web server found on force-aomori.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T09:59:28.415085+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T09:59:28.415085+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T09:59:28.420408+00:00", "source": "nikto", "text": "Nikto scanning http://force-chugoku.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T10:00:48.929788+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T10:00:48.929788+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:00:48.929788+00:00", "source": "nikto", "text": "+ No web server found on force-chugoku.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T10:00:48.929788+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:00:48.929788+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T10:00:48.932255+00:00", "source": "nikto", "text": "Nikto scanning http://force-hakodate.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T10:02:09.275725+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T10:02:09.275725+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:02:09.275725+00:00", "source": "nikto", "text": "+ No web server found on force-hakodate.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T10:02:09.275725+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:02:09.275725+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T10:02:09.277132+00:00", "source": "nikto", "text": "Nikto scanning http://force-iwate.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T10:03:29.923219+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T10:03:29.923219+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:03:29.923219+00:00", "source": "nikto", "text": "+ No web server found on force-iwate.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T10:03:29.923219+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:03:29.923219+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T10:03:29.926976+00:00", "source": "nikto", "text": "Nikto scanning http://force-okayama.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T10:04:50.371986+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T10:04:50.371986+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:04:50.371986+00:00", "source": "nikto", "text": "+ No web server found on force-okayama.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T10:04:50.371986+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:04:50.371986+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T10:04:50.373366+00:00", "source": "nikto", "text": "Nikto scanning http://force-okinawa.mitsubishi-fuso.com"}
+{"ts": "2025-12-16T10:06:11.061049+00:00", "source": "nikto", "text": "- Nikto v2.1.6"}
+{"ts": "2025-12-16T10:06:11.061049+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:06:11.061049+00:00", "source": "nikto", "text": "+ No web server found on force-okinawa.mitsubishi-fuso.com:80"}
+{"ts": "2025-12-16T10:06:11.061049+00:00", "source": "nikto", "text": "---------------------------------------------------------------------------"}
+{"ts": "2025-12-16T10:06:11.061049+00:00", "source": "nikto", "text": "+ 0 host(s) tested"}
+{"ts": "2025-12-16T10:06:11.062951+00:00", "source": "nikto", "text": "Nikto scanning http://force-portal-qa.mitsubishi-fuso.com"}
