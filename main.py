@@ -8320,7 +8320,8 @@ def start_pipeline_job(domain: str, wordlist: Optional[str], skip_nikto: bool, i
 
     with JOB_LOCK:
         if normalized in RUNNING_JOBS:
-            return False, f"A job for {normalized} already exists (status: {RUNNING_JOBS[normalized].get('status')})."
+            existing_status = RUNNING_JOBS[normalized].get('status', 'unknown')
+            return True, f"A job for {normalized} is already {existing_status}. Continuing with existing scan."
         now = datetime.now(timezone.utc).isoformat()
         job_record = {
             "domain": normalized,
