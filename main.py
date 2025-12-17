@@ -4703,8 +4703,8 @@ function buildDetailHtml(domain, sub, info, history) {
   let nmapHtml = '<div class="detail-section"><h4>Nmap Port Scan</h4>';
   if (nmap.scan_output) {
     // Parse nmap output for port information
-    const lines = (nmap.scan_output || '').split('\\n');
-    const portLines = lines.filter(line => /^\\d+\\/\\w+\\s+\\w+\\s+/.test(line.trim()));
+    const lines = (nmap.scan_output || '').split('\n');
+    const portLines = lines.filter(line => /^\d+\/\w+\s+\w+\s+/.test(line.trim()));
     if (portLines.length > 0) {
       nmapHtml += `
         <div class="table-wrapper">
@@ -4719,7 +4719,7 @@ function buildDetailHtml(domain, sub, info, history) {
             </thead>
             <tbody>
               ${portLines.map(line => {
-                const parts = line.trim().split(/\\s+/);
+                const parts = line.trim().split(/\s+/);
                 const port = parts[0] || '';
                 const state = parts[1] || '';
                 const service = parts[2] || '';
