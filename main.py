@@ -3821,17 +3821,31 @@ function renderWorkers(workers) {
   const tools = workers.tools || {};
   const toolCards = Object.keys(tools).sort().map(name => {
     const info = tools[name] || {};
-    const limit = info.limit || 1;
+    const limit = info.limit;
     const active = info.active || 0;
-    const pct = limit ? Math.min(100, Math.round(active / limit * 100)) : 0;
-    return `
-      <div class="worker-card">
-        <h3>${escapeHtml(name)}</h3>
-        <div class="metric">${active}/${limit}</div>
-        <div class="muted">slots in use</div>
-        <div class="worker-progress">${renderProgress(pct, active >= limit ? 'running' : 'completed')}</div>
-      </div>
-    `;
+    
+    // Handle tools with and without concurrency gates
+    if (limit === null || limit === undefined) {
+      // Tool without gate - just show as available
+      return `
+        <div class="worker-card">
+          <h3>${escapeHtml(name)}</h3>
+          <div class="metric">Available</div>
+          <div class="muted">no concurrency limit</div>
+        </div>
+      `;
+    } else {
+      // Tool with gate - show active/limit
+      const pct = limit ? Math.min(100, Math.round(active / limit * 100)) : 0;
+      return `
+        <div class="worker-card">
+          <h3>${escapeHtml(name)}</h3>
+          <div class="metric">${active}/${limit}</div>
+          <div class="muted">slots in use</div>
+          <div class="worker-progress">${renderProgress(pct, active >= limit ? 'running' : 'completed')}</div>
+        </div>
+      `;
+    }
   }).join('') || '<div class="section-placeholder">No tool data.</div>';
   workersBody.innerHTML = `<div class="worker-grid">${jobCard}${toolCards}</div>`;
 }
@@ -3919,6 +3933,8 @@ function computeReportStats(info) {
   let niktoCount = 0;
   let screenshotCount = 0;
   let maxSeverity = 'NONE';
+  let maxNucleiSeverity = 'NONE';
+  let maxNiktoSeverity = 'NONE';
   let processedSubdomains = 0;
   let pendingSubdomains = 0;
   let pendingHttp = 0;
@@ -3955,11 +3971,17 @@ function computeReportStats(info) {
       if (severityIsHigher(sev, maxSeverity)) {
         maxSeverity = sev;
       }
+      if (severityIsHigher(sev, maxNucleiSeverity)) {
+        maxNucleiSeverity = sev;
+      }
     });
     (entry && entry.nikto || []).forEach(finding => {
       const sev = normalizeSeverity(finding && finding.severity, 'INFO');
       if (severityIsHigher(sev, maxSeverity)) {
         maxSeverity = sev;
+      }
+      if (severityIsHigher(sev, maxNiktoSeverity)) {
+        maxNiktoSeverity = sev;
       }
     });
   });
@@ -3970,6 +3992,8 @@ function computeReportStats(info) {
     nikto: niktoCount,
     screenshots: screenshotCount,
     maxSeverity,
+    maxNucleiSeverity,
+    maxNiktoSeverity,
     processed_subdomains: processedSubdomains,
     pending_subdomains: pendingSubdomains,
     pending_http: pendingHttp,
@@ -4300,6 +4324,12 @@ function renderReportDetail(domain) {
   const maxSeverity = stats.maxSeverity || 'NONE';
   const maxSeverityText = formatSeverityLabel(maxSeverity);
   const maxSeverityFlag = `<span class="severity-flag ${escapeHtml(maxSeverity)}">Max: ${escapeHtml(maxSeverityText)}</span>`;
+  const maxNucleiSeverity = stats.maxNucleiSeverity || 'NONE';
+  const maxNucleiSeverityText = formatSeverityLabel(maxNucleiSeverity);
+  const maxNucleiSeverityFlag = `<span class="severity-flag ${escapeHtml(maxNucleiSeverity)}">Nuclei: ${escapeHtml(maxNucleiSeverityText)}</span>`;
+  const maxNiktoSeverity = stats.maxNiktoSeverity || 'NONE';
+  const maxNiktoSeverityText = formatSeverityLabel(maxNiktoSeverity);
+  const maxNiktoSeverityFlag = `<span class="severity-flag ${escapeHtml(maxNiktoSeverity)}">Nikto: ${escapeHtml(maxNiktoSeverityText)}</span>`;
   const activeJob = hasActiveJob(domain);
   const canResume = info.pending && !activeJob;
   const resumeButton = canResume ? `<button class="btn small" data-resume-target="${escapeHtml(domain)}">Resume Scan</button>` : '';
@@ -4391,8 +4421,16 @@ function renderReportDetail(domain) {
         <div class="value">${stats.screenshots}</div>
       </div>
       <div class="report-stat">
-        <div class="label">Max severity</div>
+        <div class="label">Max severity (Overall)</div>
         <div class="value">${maxSeverityFlag}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Highest Nuclei</div>
+        <div class="value">${maxNucleiSeverityFlag}</div>
+      </div>
+      <div class="report-stat">
+        <div class="label">Highest Nikto</div>
+        <div class="value">${maxNiktoSeverityFlag}</div>
       </div>
     </div>
     <div class="report-stats-grid">
@@ -5001,10 +5039,18 @@ def snapshot_workers() -> Dict[str, Any]:
     with JOB_LOCK:
         active_jobs = count_active_jobs_locked()
         queue_len = len(JOB_QUEUE)
-    tool_stats = {
-        name: gate.snapshot()
-        for name, gate in TOOL_GATES.items()
-    }
+    # Include all tools with their gate information if they have one
+    tool_stats = {}
+    for name in TOOLS.keys():
+        if name in TOOL_GATES:
+            # Tool has a gate, show active/limit
+            tool_stats[name] = TOOL_GATES[name].snapshot()
+        else:
+            # Tool without gate, show as available but no concurrency limit
+            tool_stats[name] = {
+                "limit": None,
+                "active": 0,
+            }
     return {
         "job_slots": {
             "limit": MAX_RUNNING_JOBS,
