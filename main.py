@@ -3677,6 +3677,26 @@ button:hover { background:#1d4ed8; }
                 <input id="settings-enable-sublist3r" type="checkbox" name="enable_sublist3r" />
                 Enable Sublist3r
               </label>
+              <label class="checkbox">
+                <input id="settings-enable-crtsh" type="checkbox" name="enable_crtsh" />
+                Enable crt.sh
+              </label>
+              <label class="checkbox">
+                <input id="settings-enable-github-subdomains" type="checkbox" name="enable_github_subdomains" />
+                Enable GitHub Subdomains
+              </label>
+              <label class="checkbox">
+                <input id="settings-enable-dnsx" type="checkbox" name="enable_dnsx" />
+                Enable DNSx
+              </label>
+              <label class="checkbox">
+                <input id="settings-enable-waybackurls" type="checkbox" name="enable_waybackurls" />
+                Enable Waybackurls
+              </label>
+              <label class="checkbox">
+                <input id="settings-enable-gau" type="checkbox" name="enable_gau" />
+                Enable GAU
+              </label>
               <label>Subfinder threads
                 <input id="settings-subfinder-threads" type="number" name="subfinder_threads" min="1" />
               </label>
@@ -3685,6 +3705,9 @@ button:hover { background:#1d4ed8; }
               </label>
               <label>Findomain threads
                 <input id="settings-findomain-threads" type="number" name="findomain_threads" min="1" />
+              </label>
+              <label>Global rate limit (seconds between tool calls, 0 = disabled)
+                <input id="settings-global-rate-limit" type="number" name="global_rate_limit" min="0" step="0.1" />
               </label>
               <label>Max concurrent jobs
                 <input id="settings-max-jobs" type="number" name="max_running_jobs" min="1" />
@@ -3700,6 +3723,15 @@ button:hover { background:#1d4ed8; }
               </label>
               <label>Screenshot parallel slots
                 <input id="settings-gowitness" type="number" name="max_parallel_gowitness" min="1" />
+              </label>
+              <label>DNSx parallel slots
+                <input id="settings-dnsx" type="number" name="max_parallel_dnsx" min="1" />
+              </label>
+              <label>Waybackurls parallel slots
+                <input id="settings-waybackurls" type="number" name="max_parallel_waybackurls" min="1" />
+              </label>
+              <label>GAU parallel slots
+                <input id="settings-gau" type="number" name="max_parallel_gau" min="1" />
               </label>
               <h4>Command templates</h4>
               <p class="muted">Customize flags for each tool with variables such as <code>$DOMAIN$</code>, <code>$WORDLIST$</code>, <code>$OUTPUT$</code>, <code>$OUTPUT_JSON$</code>, <code>$INPUT_FILE$</code>, <code>$TARGET_URL$</code>, <code>$SUBDOMAIN$</code>, <code>$TARGETS_FILE$</code>, <code>$OUTPUT_PREFIX$</code>, <code>$OUTPUT_DIR$</code>, <code>$DB_PATH$</code>, <code>$THREADS$</code>, and <code>$HOST_HEADER$</code>.</p>
@@ -3719,11 +3751,26 @@ button:hover { background:#1d4ed8; }
                 <label>Sublist3r flags
                   <textarea id="template-sublist3r" class="template-input" placeholder=""></textarea>
                 </label>
+                <label>crt.sh flags
+                  <textarea id="template-crtsh" class="template-input" placeholder=""></textarea>
+                </label>
+                <label>GitHub Subdomains flags
+                  <textarea id="template-github-subdomains" class="template-input" placeholder=""></textarea>
+                </label>
+                <label>DNSx flags
+                  <textarea id="template-dnsx" class="template-input" placeholder="-silent"></textarea>
+                </label>
                 <label>ffuf flags
                   <textarea id="template-ffuf" class="template-input" placeholder="-rate 50"></textarea>
                 </label>
                 <label>httpx flags
                   <textarea id="template-httpx" class="template-input" placeholder="-silent"></textarea>
+                </label>
+                <label>Waybackurls flags
+                  <textarea id="template-waybackurls" class="template-input" placeholder=""></textarea>
+                </label>
+                <label>GAU flags
+                  <textarea id="template-gau" class="template-input" placeholder=""></textarea>
                 </label>
                 <label>nuclei flags
                   <textarea id="template-nuclei" class="template-input" placeholder="-severity medium,high"></textarea>
@@ -3733,6 +3780,9 @@ button:hover { background:#1d4ed8; }
                 </label>
                 <label>Screenshot flags (gowitness)
                   <textarea id="template-gowitness" class="template-input" placeholder=""></textarea>
+                </label>
+                <label>nmap flags
+                  <textarea id="template-nmap" class="template-input" placeholder=""></textarea>
                 </label>
               </div>
               <p class="template-note">Tip: leave a field blank to use the built-in defaults. Need examples? Visit the User Guide from the sidebar.</p>
@@ -3852,14 +3902,23 @@ const settingsEnableSubfinder = document.getElementById('settings-enable-subfind
 const settingsEnableAssetfinder = document.getElementById('settings-enable-assetfinder');
 const settingsEnableFindomain = document.getElementById('settings-enable-findomain');
 const settingsEnableSublist3r = document.getElementById('settings-enable-sublist3r');
+const settingsEnableCrtsh = document.getElementById('settings-enable-crtsh');
+const settingsEnableGithubSubdomains = document.getElementById('settings-enable-github-subdomains');
+const settingsEnableDnsx = document.getElementById('settings-enable-dnsx');
+const settingsEnableWaybackurls = document.getElementById('settings-enable-waybackurls');
+const settingsEnableGau = document.getElementById('settings-enable-gau');
 const settingsSubfinderThreads = document.getElementById('settings-subfinder-threads');
 const settingsAssetfinderThreads = document.getElementById('settings-assetfinder-threads');
 const settingsFindomainThreads = document.getElementById('settings-findomain-threads');
+const settingsGlobalRateLimit = document.getElementById('settings-global-rate-limit');
 const settingsMaxJobs = document.getElementById('settings-max-jobs');
 const settingsFFUF = document.getElementById('settings-ffuf');
 const settingsNuclei = document.getElementById('settings-nuclei');
 const settingsNikto = document.getElementById('settings-nikto');
 const settingsGowitness = document.getElementById('settings-gowitness');
+const settingsDnsx = document.getElementById('settings-dnsx');
+const settingsWaybackurls = document.getElementById('settings-waybackurls');
+const settingsGau = document.getElementById('settings-gau');
 const settingsStatus = document.getElementById('settings-status');
 const settingsSummary = document.getElementById('settings-summary');
 const templateInputs = {
@@ -3868,11 +3927,17 @@ const templateInputs = {
   assetfinder: document.getElementById('template-assetfinder'),
   findomain: document.getElementById('template-findomain'),
   sublist3r: document.getElementById('template-sublist3r'),
+  crtsh: document.getElementById('template-crtsh'),
+  'github-subdomains': document.getElementById('template-github-subdomains'),
+  dnsx: document.getElementById('template-dnsx'),
   ffuf: document.getElementById('template-ffuf'),
   httpx: document.getElementById('template-httpx'),
+  waybackurls: document.getElementById('template-waybackurls'),
+  gau: document.getElementById('template-gau'),
   nuclei: document.getElementById('template-nuclei'),
   nikto: document.getElementById('template-nikto'),
   gowitness: document.getElementById('template-gowitness'),
+  nmap: document.getElementById('template-nmap'),
 };
 const monitorForm = document.getElementById('monitor-form');
 const monitorName = document.getElementById('monitor-name');
@@ -3892,9 +3957,15 @@ const STEP_SEQUENCE = [
   { flag: 'assetfinder_done', label: 'Assetfinder' },
   { flag: 'findomain_done', label: 'Findomain' },
   { flag: 'sublist3r_done', label: 'Sublist3r' },
+  { flag: 'crtsh_done', label: 'crt.sh' },
+  { flag: 'github_subdomains_done', label: 'GitHub Subdomains' },
+  { flag: 'dnsx_done', label: 'DNSx' },
   { flag: 'ffuf_done', label: 'ffuf' },
   { flag: 'httpx_done', label: 'httpx' },
+  { flag: 'waybackurls_done', label: 'Waybackurls' },
+  { flag: 'gau_done', label: 'GAU' },
   { flag: 'screenshots_done', label: 'Screenshots', skipWhen: () => latestConfig.enable_screenshots === false },
+  { flag: 'nmap_done', label: 'nmap' },
   { flag: 'nuclei_done', label: 'Nuclei' },
   { flag: 'nikto_done', label: 'Nikto', skipWhen: (info) => shouldSkipNikto(info) },
 ];
@@ -4230,6 +4301,15 @@ function renderTargets(targets) {
   }
   entries.sort((a, b) => a[0].localeCompare(b[0]));
   let subCount = 0;
+  
+  // Add export buttons at the top
+  const exportButtons = `
+    <div class="export-controls" style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+      <a class="btn secondary small" href="/api/export/state" target="_blank">Export JSON</a>
+      <a class="btn secondary small" href="/api/export/csv" target="_blank">Export CSV</a>
+    </div>
+  `;
+  
   const cards = entries.map(([domain, info]) => {
     const subs = (info && info.subdomains) || {};
     const flags = (info && info.flags) || {};
@@ -4265,15 +4345,23 @@ function renderTargets(targets) {
       <span class="badge">Assetfinder: ${flags.assetfinder_done ? '✅' : '⏳'}</span>
       <span class="badge">Findomain: ${flags.findomain_done ? '✅' : '⏳'}</span>
       <span class="badge">Sublist3r: ${flags.sublist3r_done ? '✅' : '⏳'}</span>
+      <span class="badge">crt.sh: ${flags.crtsh_done ? '✅' : '⏳'}</span>
+      <span class="badge">GitHub: ${flags.github_subdomains_done ? '✅' : '⏳'}</span>
+      <span class="badge">DNSx: ${flags.dnsx_done ? '✅' : '⏳'}</span>
       <span class="badge">ffuf: ${flags.ffuf_done ? '✅' : '⏳'}</span>
       <span class="badge">httpx: ${flags.httpx_done ? '✅' : '⏳'}</span>
+      <span class="badge">Wayback: ${flags.waybackurls_done ? '✅' : '⏳'}</span>
+      <span class="badge">GAU: ${flags.gau_done ? '✅' : '⏳'}</span>
       <span class="badge">Screenshots: ${flags.screenshots_done ? '✅' : '⏳'}</span>
+      <span class="badge">nmap: ${flags.nmap_done ? '✅' : '⏳'}</span>
       <span class="badge">nuclei: ${flags.nuclei_done ? '✅' : '⏳'}</span>
       <span class="badge">nikto: ${flags.nikto_done ? '✅' : '⏳'}</span>
     `;
+    const tableId = `targets-table-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const paginationId = `targets-pagination-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
     const table = rows ? `
       <div class="table-wrapper">
-        <table class="targets-table">
+        <table class="targets-table" id="${tableId}">
           <thead>
             <tr>
               <th>#</th>
@@ -4288,6 +4376,7 @@ function renderTargets(targets) {
           <tbody>${rows}</tbody>
         </table>
       </div>
+      <div class="table-pagination" id="${paginationId}"></div>
     ` : '<p class="muted">No subdomains collected yet.</p>';
     return `
       <div class="target-card" data-domain="${escapeHtml(domain)}">
@@ -4300,7 +4389,18 @@ function renderTargets(targets) {
     `;
   });
   statSubs.textContent = subCount;
-  targetsList.innerHTML = cards.join('');
+  targetsList.innerHTML = exportButtons + cards.join('');
+  
+  // Initialize pagination for each target's table
+  entries.forEach(([domain]) => {
+    const tableId = `targets-table-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const paginationId = `targets-pagination-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const table = document.getElementById(tableId);
+    const pagerEl = document.getElementById(paginationId);
+    if (table && pagerEl) {
+      initPagination(table, pagerEl, DEFAULT_PAGE_SIZE);
+    }
+  });
 }
 
 function renderWorkflowDiagram() {
@@ -5379,14 +5479,23 @@ function renderSettings(config, tools) {
     settingsEnableAssetfinder.checked = config.enable_assetfinder !== false;
     settingsEnableFindomain.checked = config.enable_findomain !== false;
     settingsEnableSublist3r.checked = config.enable_sublist3r !== false;
+    settingsEnableCrtsh.checked = config.enable_crtsh !== false;
+    settingsEnableGithubSubdomains.checked = config.enable_github_subdomains !== false;
+    settingsEnableDnsx.checked = config.enable_dnsx !== false;
+    settingsEnableWaybackurls.checked = config.enable_waybackurls !== false;
+    settingsEnableGau.checked = config.enable_gau !== false;
     settingsSubfinderThreads.value = config.subfinder_threads || 32;
     settingsAssetfinderThreads.value = config.assetfinder_threads || 10;
     settingsFindomainThreads.value = config.findomain_threads || 40;
+    settingsGlobalRateLimit.value = config.global_rate_limit || 0;
     settingsMaxJobs.value = config.max_running_jobs || 1;
     settingsFFUF.value = config.max_parallel_ffuf || 1;
     settingsNuclei.value = config.max_parallel_nuclei || 1;
     settingsNikto.value = config.max_parallel_nikto || 1;
     settingsGowitness.value = config.max_parallel_gowitness || 1;
+    settingsDnsx.value = config.max_parallel_dnsx || 1;
+    settingsWaybackurls.value = config.max_parallel_waybackurls || 1;
+    settingsGau.value = config.max_parallel_gau || 1;
     const templateValues = config.tool_flag_templates || {};
     Object.entries(templateInputs).forEach(([key, el]) => {
       if (!el) return;
@@ -5483,14 +5592,23 @@ settingsForm.addEventListener('submit', async (event) => {
     enable_assetfinder: settingsEnableAssetfinder.checked,
     enable_findomain: settingsEnableFindomain.checked,
     enable_sublist3r: settingsEnableSublist3r.checked,
+    enable_crtsh: settingsEnableCrtsh.checked,
+    enable_github_subdomains: settingsEnableGithubSubdomains.checked,
+    enable_dnsx: settingsEnableDnsx.checked,
+    enable_waybackurls: settingsEnableWaybackurls.checked,
+    enable_gau: settingsEnableGau.checked,
     subfinder_threads: settingsSubfinderThreads.value,
     assetfinder_threads: settingsAssetfinderThreads.value,
     findomain_threads: settingsFindomainThreads.value,
+    global_rate_limit: settingsGlobalRateLimit.value,
     max_running_jobs: settingsMaxJobs.value,
     max_parallel_ffuf: settingsFFUF.value,
     max_parallel_nuclei: settingsNuclei.value,
     max_parallel_nikto: settingsNikto.value,
     max_parallel_gowitness: settingsGowitness.value,
+    max_parallel_dnsx: settingsDnsx.value,
+    max_parallel_waybackurls: settingsWaybackurls.value,
+    max_parallel_gau: settingsGau.value,
   };
   const templatePayload = {};
   Object.entries(templateInputs).forEach(([key, el]) => {
