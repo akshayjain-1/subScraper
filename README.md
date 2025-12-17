@@ -6,6 +6,7 @@ Recon Command Center is a single-file orchestrator for common reconnaissance pip
 
 - **Full pipeline automation** – Amass/Subfinder/Assetfinder/Findomain/Sublist3r feed ffuf, httpx, screenshot capture, nuclei, and nikto in one go.
 - **Stateful & resumable** – Results live in `recon_data/state.json`, so re-running a target picks up exactly where it left off. Jobs can be paused/resumed live.
+- **Persistent job reports** – Completed scan reports remain visible in the dashboard with completion timestamps. All job history persists across restarts in `recon_data/completed_jobs.json`.
 - **Live dashboard** – A modern SPA served from `main.py` tracks jobs, queue, worker slots, tool availability, and detailed per-program reports.
 - **System resource monitoring** – Real-time monitoring of CPU, memory, disk, and network usage with automatic warnings when thresholds are exceeded. Helps ensure the system isn't overwhelmed.
 - **System Logs** – Dedicated logs view with advanced filtering (by source, level, text search) and sorting. Filter preferences persist between reloads.
@@ -53,6 +54,20 @@ python3 main.py '*.apps.acme.com'
 
 The easiest way to get started with all tools pre-installed:
 
+**Option 1: Docker Compose (Recommended)**
+
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Access the web interface at http://localhost:8342
+```
+
+**Option 2: Docker CLI**
+
 ```bash
 # Build the container (see DOCKER_BUILD.md for Mac-specific instructions)
 docker build -t subscraper:latest .
@@ -66,6 +81,11 @@ docker run -d \
 
 # Access the web interface at http://localhost:8342
 ```
+
+**Important**: Always mount the `recon_data` volume to persist:
+- Scan results and completed job reports
+- Configuration settings
+- Screenshots and backups
 
 For detailed Docker build instructions including multi-platform builds for Mac, see [DOCKER_BUILD.md](DOCKER_BUILD.md).
 

@@ -2,6 +2,10 @@
 
 This guide explains how to build the subScraper Docker container on macOS for multiple platforms.
 
+## What's New
+
+**Persistent Completed Job Reports**: As of the latest version, completed scan reports now persist in the dashboard and across container restarts. All job history is stored in `recon_data/completed_jobs.json` and automatically loaded on startup.
+
 ## Prerequisites
 
 1. **Install Docker Desktop for Mac**
@@ -83,6 +87,17 @@ docker run -d \
   subscraper:latest
 ```
 
+**Important**: The `recon_data` volume mount is required to persist:
+- Scan results and state (`state.json`)
+- Configuration settings (`config.json`)
+- Completed job reports (`completed_jobs.json`) - *keeps scan history visible*
+- Domain history logs (`history/`)
+- Screenshots (`screenshots/`)
+- Backup files (`backups/`)
+- Monitor configurations (`monitors.json`)
+
+Without the volume mount, all data will be lost when the container stops.
+
 ### Run with Custom Configuration
 
 ```bash
@@ -120,9 +135,84 @@ docker run --rm \
 Once the container is running, access the web interface at:
 - http://localhost:8342
 
+## Data Persistence and Management
+
+### Understanding Data Persistence
+
+All application data is stored in the `recon_data` directory, which should be mounted as a volume:
+
+```
+recon_data/
+├── state.json              # Scan results and subdomain data
+├── config.json             # Application configuration
+├── completed_jobs.json     # Job history (keeps reports visible)
+├── monitors.json           # Monitor configurations
+├── system_resources.json   # Resource monitoring data
+├── history/                # Domain-specific command logs
+├── screenshots/            # Captured screenshots
+└── backups/               # Automatic and manual backups
+```
+
+### Backing Up Data
+
+**Method 1: Copy the entire directory**
+```bash
+# While container is running
+docker cp subscraper:/app/recon_data ./backup_$(date +%Y%m%d)
+```
+
+**Method 2: Use built-in backup feature**
+1. Access the web interface at http://localhost:8342
+2. Go to Settings → Backup & Restore
+3. Click "Create Backup"
+4. Backups are saved to `recon_data/backups/`
+
+### Restoring Data
+
+**Method 1: Restore from directory backup**
+```bash
+# Stop the container
+docker stop subscraper
+
+# Restore the data
+cp -r ./backup_20231217/* ./recon_data/
+
+# Start the container
+docker start subscraper
+```
+
+**Method 2: Use built-in restore feature**
+1. Access the web interface
+2. Go to Settings → Backup & Restore
+3. Select a backup and click "Restore"
+
+### Migrating to a New Container
+
+To migrate data to a new container:
+
+```bash
+# Stop old container
+docker stop subscraper
+
+# Backup data
+cp -r ./recon_data ./recon_data_backup
+
+# Remove old container
+docker rm subscraper
+
+# Start new container with same volume
+docker run -d \
+  --name subscraper \
+  -p 8342:8342 \
+  -v $(pwd)/recon_data:/app/recon_data \
+  subscraper:latest
+```
+
+All completed job reports, scan results, and configuration will be preserved.
+
 ## Docker Compose (Optional)
 
-Create a `docker-compose.yml` file:
+Create a `docker-compose.yml` file for easier management:
 
 ```yaml
 version: '3.8'
@@ -134,18 +224,39 @@ services:
     ports:
       - "8342:8342"
     volumes:
+      # Required: Persists all scan data, job history, and configuration
       - ./recon_data:/app/recon_data
+      # Optional: Custom wordlists for subdomain brute-forcing
       - ./wordlists:/app/wordlists
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8342/api/state"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
 ```
 
 Then run:
 
 ```bash
+# Start the service
 docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
 ```
+
+**Data Persistence**: The `recon_data` volume ensures:
+- ✅ Completed job reports remain visible in dashboard
+- ✅ All scan results persist across container restarts
+- ✅ Configuration and settings are preserved
+- ✅ Backup files are accessible
 
 ## Troubleshooting
 

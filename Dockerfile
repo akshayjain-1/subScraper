@@ -83,7 +83,20 @@ COPY main.py /app/
 COPY README.md /app/
 
 # Create data directory
+# This directory stores all application data including:
+# - state.json: scan results and subdomain data
+# - config.json: application configuration
+# - completed_jobs.json: job history (NEW - keeps reports visible in dashboard)
+# - monitors.json: monitor configurations
+# - history/: domain-specific command logs
+# - screenshots/: captured screenshots
+# - backups/: automatic and manual backups
 RUN mkdir -p /app/recon_data
+
+# Declare volume for persistent data
+# Mount this directory to preserve data across container restarts:
+#   docker run -v $(pwd)/recon_data:/app/recon_data ...
+VOLUME ["/app/recon_data"]
 
 # Expose port for web interface
 EXPOSE 8342
