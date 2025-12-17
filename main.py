@@ -1903,6 +1903,12 @@ def run_downstream_pipeline(
                 job_log_append(job_domain, "waybackurls slot acquired.", "scheduler")
             urls = waybackurls_enum(domain, job_domain=job_domain)
         log(f"waybackurls found {len(urls)} URLs.")
+        # Store endpoints in state
+        tgt = ensure_target_state(state, domain)
+        existing_endpoints = set(tgt.get("endpoints", []))
+        for url in urls:
+            if url and url not in existing_endpoints:
+                tgt["endpoints"].append(url)
         flags["waybackurls_done"] = True
         save_state(state)
         update_step("waybackurls", status="completed", message=f"waybackurls found {len(urls)} URLs.", progress=100)
@@ -1924,6 +1930,12 @@ def run_downstream_pipeline(
                 job_log_append(job_domain, "gau slot acquired.", "scheduler")
             urls = gau_enum(domain, job_domain=job_domain)
         log(f"gau found {len(urls)} URLs.")
+        # Store endpoints in state
+        tgt = ensure_target_state(state, domain)
+        existing_endpoints = set(tgt.get("endpoints", []))
+        for url in urls:
+            if url and url not in existing_endpoints:
+                tgt["endpoints"].append(url)
         flags["gau_done"] = True
         save_state(state)
         update_step("gau", status="completed", message=f"gau found {len(urls)} URLs.", progress=100)
@@ -2566,6 +2578,7 @@ def ensure_target_state(state: Dict[str, Any], domain: str) -> Dict[str, Any]:
     targets = state.setdefault("targets", {})
     tgt = targets.setdefault(domain, {
         "subdomains": {},
+        "endpoints": [],  # Store discovered URLs from waybackurls and gau
         "flags": {
             "amass_done": False,
             "subfinder_done": False,
@@ -2582,6 +2595,7 @@ def ensure_target_state(state: Dict[str, Any], domain: str) -> Dict[str, Any]:
     })
     # Normalize missing keys
     tgt.setdefault("subdomains", {})
+    tgt.setdefault("endpoints", [])
     tgt.setdefault("flags", {})
     tgt.setdefault("options", {})
     for k in ["amass_done", "subfinder_done", "assetfinder_done", "findomain_done", "sublist3r_done",
@@ -3607,6 +3621,15 @@ button:hover { background:#1d4ed8; }
 .error-source { color:#f87171; font-weight:600; }
 .sort-indicator { margin-left:4px; font-size:10px; color:var(--muted); }
 .filter-bar select, .filter-bar input[type="search"] { width:100%; padding:8px; border-radius:8px; border:1px solid #1f2937; background:#0b152c; color:var(--text); }
+.gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px; margin-top:20px; }
+.gallery-card { background:var(--panel-alt); border-radius:12px; overflow:hidden; border:1px solid #1f2937; transition:transform .2s ease; }
+.gallery-card:hover { transform:translateY(-4px); }
+.gallery-image { width:100%; height:180px; object-fit:cover; cursor:pointer; background:#0f172a; }
+.gallery-info { padding:14px; }
+.gallery-subdomain { font-weight:600; color:#f1f5f9; margin-bottom:6px; word-break:break-all; font-size:13px; }
+.gallery-url { color:#60a5fa; text-decoration:none; font-size:12px; word-break:break-all; display:block; margin-bottom:8px; }
+.gallery-url:hover { text-decoration:underline; }
+.gallery-meta { font-size:11px; color:var(--muted); }
 @media (max-width: 900px) {
   .app-shell { flex-direction:column; }
   .sidebar { width:100%; height:auto; position:relative; }
@@ -3630,6 +3653,7 @@ button:hover { background:#1d4ed8; }
       <a class="nav-link" data-view="workers" href="#workers">Workers</a>
       <a class="nav-link" data-view="queue" href="#queue">Queue</a>
       <a class="nav-link" data-view="reports" href="#reports">Reports</a>
+      <a class="nav-link" data-view="gallery" href="#gallery">Gallery</a>
       <a class="nav-link" data-view="logs" href="#logs">Logs</a>
       <a class="nav-link" data-view="monitors" href="#monitors">Monitors</a>
       <a class="nav-link" data-view="targets" href="#targets">Targets</a>
@@ -3740,6 +3764,21 @@ button:hover { background:#1d4ed8; }
       <div class="module-header"><h2>Reports & Export</h2></div>
       <div class="module-body" id="reports-body">
         <div class="section-placeholder">No data yet.</div>
+      </div>
+    </section>
+
+    <section class="module" data-view="gallery">
+      <div class="module-header"><h2>Screenshot Gallery</h2></div>
+      <div class="module-body" id="gallery-body">
+        <div class="section-placeholder">Select a target from the dropdown to view screenshots.</div>
+        <div style="margin: 20px 0;">
+          <label>Select Target
+            <select id="gallery-target-select" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #1f2937; background: #0b152c; color: var(--text);">
+              <option value="">-- Select a target --</option>
+            </select>
+          </label>
+        </div>
+        <div id="gallery-grid" class="gallery-grid"></div>
       </div>
     </section>
 
@@ -5567,6 +5606,33 @@ function renderReportDetail(domain) {
       ${buildStepChecklist(info)}
     </div>
   `;
+  // Endpoints section (URLs from waybackurls and gau)
+  const endpoints = info.endpoints || [];
+  const endpointsTitle = `Endpoints (${endpoints.length})`;
+  const endpointsBody = endpoints.length > 0 ? `
+    <div class="filter-bar">
+      <input type="search" class="report-search" placeholder="Search endpoints…" data-endpoint-search />
+    </div>
+    <div class="table-wrapper">
+      <table class="targets-table" id="endpoints-table">
+        <thead>
+          <tr>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${endpoints.slice(0, 500).map(url => `
+            <tr data-endpoint="${escapeHtml(url.toLowerCase())}">
+              <td><a href="${escapeHtml(url)}" target="_blank" class="link-btn">${escapeHtml(url)}</a></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${endpoints.length > 500 ? `<p class="muted">Showing first 500 of ${endpoints.length} endpoints</p>` : ''}
+    <div class="table-pagination" id="endpoints-pagination"></div>
+  ` : '<p class="muted">No endpoints discovered yet.</p>';
+  
   const subPaginationId = 'subdomains-pagination';
   const nucleiPaginationId = 'nuclei-pagination';
   const niktoPaginationId = 'nikto-pagination';
@@ -5654,6 +5720,7 @@ function renderReportDetail(domain) {
     </div>
     ${renderCollapsibleSection('overview', 'Overview', overviewBody, true)}
     ${renderCollapsibleSection('subdomains', subdomainsTitle, subdomainsBody, true)}
+    ${endpoints.length > 0 ? renderCollapsibleSection('endpoints', endpointsTitle, endpointsBody, false) : ''}
     ${renderCollapsibleSection('nuclei', nucleiTitle, nucleiContent, nucleiRows.length > 0)}
     ${renderCollapsibleSection('nikto', niktoTitle, niktoContent, false)}
     ${renderCollapsibleSection('commands', 'Command History', commandsBody, false)}
@@ -5664,6 +5731,10 @@ function renderReportDetail(domain) {
   initPagination(detail.querySelector('#subdomains-table'), detail.querySelector('#' + subPaginationId), DEFAULT_PAGE_SIZE);
   initPagination(detail.querySelector('#nuclei-table'), detail.querySelector('#' + nucleiPaginationId), DEFAULT_PAGE_SIZE);
   initPagination(detail.querySelector('#nikto-table'), detail.querySelector('#' + niktoPaginationId), DEFAULT_PAGE_SIZE);
+  if (endpoints.length > 0) {
+    initPagination(detail.querySelector('#endpoints-table'), detail.querySelector('#endpoints-pagination'), DEFAULT_PAGE_SIZE);
+    attachEndpointFilter(detail);
+  }
   attachSubdomainFilters(detail);
   attachSeverityFilter(detail.querySelector('[data-nuclei-filter]'), detail.querySelector('#nuclei-table'));
   attachSeverityFilter(detail.querySelector('[data-nikto-filter]'), detail.querySelector('#nikto-table'));
@@ -5718,6 +5789,27 @@ function attachSeverityFilter(wrapper, table) {
     refreshPagination(table);
   };
   checkboxes.forEach(cb => cb.addEventListener('change', apply));
+  apply();
+}
+
+function attachEndpointFilter(detailEl) {
+  const table = detailEl.querySelector('#endpoints-table');
+  if (!table) return;
+  const searchInput = detailEl.querySelector('[data-endpoint-search]');
+  if (!searchInput) return;
+  
+  const apply = () => {
+    const query = (searchInput.value || '').trim().toLowerCase();
+    const rows = table.tBodies[0] ? Array.from(table.tBodies[0].rows) : [];
+    rows.forEach(row => {
+      const endpoint = row.dataset.endpoint || '';
+      const matchesSearch = !query || endpoint.includes(query);
+      row.dataset.filterHidden = matchesSearch ? 'false' : 'true';
+    });
+    refreshPagination(table);
+  };
+  
+  searchInput.addEventListener('input', apply);
   apply();
 }
 
@@ -5982,6 +6074,7 @@ async function fetchState() {
     renderWorkers(data.workers || {});
     renderReports(data.targets || {});
     renderMonitors(data.monitors || []);
+    renderGallery(data.targets || {});
     
     // Update logs view if visible
     const logsSection = document.querySelector('[data-view="logs"]');
@@ -6349,6 +6442,182 @@ if (logClearFilters) {
 
 // Load saved filters on page load
 loadLogFilters();
+
+// ================== GALLERY RENDERING ==================
+
+const galleryTargetSelect = document.getElementById('gallery-target-select');
+const galleryGrid = document.getElementById('gallery-grid');
+
+function renderGallery(targets) {
+  // Update target dropdown
+  if (galleryTargetSelect) {
+    const options = '<option value="">-- Select a target --</option>' +
+      Object.keys(targets).sort().map(domain => 
+        `<option value="${escapeHtml(domain)}">${escapeHtml(domain)}</option>`
+      ).join('');
+    galleryTargetSelect.innerHTML = options;
+  }
+}
+
+if (galleryTargetSelect) {
+  galleryTargetSelect.addEventListener('change', async (e) => {
+    const domain = e.target.value;
+    if (!domain || !galleryGrid) {
+      if (galleryGrid) galleryGrid.innerHTML = '';
+      return;
+    }
+    
+    galleryGrid.innerHTML = '<div class="section-placeholder">Loading screenshots...</div>';
+    
+    try {
+      const resp = await fetch(`/api/gallery/${encodeURIComponent(domain)}`);
+      if (!resp.ok) throw new Error('Failed to load gallery');
+      const data = await resp.json();
+      
+      if (!data.success) {
+        galleryGrid.innerHTML = `<div class="section-placeholder">${escapeHtml(data.message || 'Failed to load gallery')}</div>`;
+        return;
+      }
+      
+      const screenshots = data.screenshots || [];
+      if (screenshots.length === 0) {
+        galleryGrid.innerHTML = '<div class="section-placeholder">No screenshots available for this target.</div>';
+        return;
+      }
+      
+      const html = screenshots.map(shot => {
+        const statusClass = shot.status_code >= 200 && shot.status_code < 300 ? 'status-2xx' :
+                            shot.status_code >= 300 && shot.status_code < 400 ? 'status-3xx' :
+                            shot.status_code >= 400 && shot.status_code < 500 ? 'status-4xx' : 'status-5xx';
+        const statusBadge = shot.status_code ? `<span class="status-badge ${statusClass}">${shot.status_code}</span>` : '';
+        
+        return `
+          <div class="gallery-card">
+            <img class="gallery-image" src="/screenshots/${escapeHtml(shot.path)}" 
+                 alt="${escapeHtml(shot.subdomain)}" 
+                 onclick="window.open('/screenshots/${escapeHtml(shot.path)}', '_blank')" />
+            <div class="gallery-info">
+              <div class="gallery-subdomain">${escapeHtml(shot.subdomain)}</div>
+              <a href="${escapeHtml(shot.url)}" target="_blank" class="gallery-url">${escapeHtml(shot.url)}</a>
+              <div class="gallery-meta">
+                ${statusBadge}
+                ${shot.title ? `<span class="badge">${escapeHtml(shot.title)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      galleryGrid.innerHTML = html;
+    } catch (err) {
+      galleryGrid.innerHTML = `<div class="section-placeholder">Error: ${escapeHtml(err.message)}</div>`;
+    }
+  });
+}
+
+// ================== FILTER PERSISTENCE ==================
+
+// Save and restore report filters
+function saveReportFilters(domain, filters) {
+  try {
+    const key = `reportFilters_${domain}`;
+    localStorage.setItem(key, JSON.stringify(filters));
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
+function loadReportFilters(domain) {
+  try {
+    const key = `reportFilters_${domain}`;
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Save checkbox states
+function saveCheckboxState(id, checked) {
+  try {
+    localStorage.setItem(`checkbox_${id}`, checked ? '1' : '0');
+  } catch (e) {
+    // Ignore
+  }
+}
+
+function loadCheckboxState(id, defaultValue = false) {
+  try {
+    const saved = localStorage.getItem(`checkbox_${id}`);
+    return saved === '1' ? true : saved === '0' ? false : defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+}
+
+// Apply to all checkboxes on page
+document.querySelectorAll('input[type="checkbox"][id]').forEach(checkbox => {
+  const savedState = loadCheckboxState(checkbox.id);
+  if (savedState !== null) {
+    checkbox.checked = savedState;
+  }
+  checkbox.addEventListener('change', () => {
+    saveCheckboxState(checkbox.id, checkbox.checked);
+  });
+});
+
+// Enhance attachSubdomainFilters to persist state
+const originalAttachSubdomainFilters = attachSubdomainFilters;
+attachSubdomainFilters = function(detailEl) {
+  originalAttachSubdomainFilters(detailEl);
+  
+  // Load saved filter state if available
+  const domain = detailEl.querySelector('[data-domain]')?.getAttribute('data-domain');
+  if (domain) {
+    const saved = loadReportFilters(domain);
+    if (saved) {
+      const statusGroup = detailEl.querySelector('[data-status-filter]');
+      const searchInput = detailEl.querySelector('[data-sub-search]');
+      
+      if (saved.statusFilters && statusGroup) {
+        statusGroup.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          if (saved.statusFilters.includes(cb.value)) {
+            cb.checked = true;
+          } else {
+            cb.checked = false;
+          }
+        });
+      }
+      
+      if (saved.searchQuery && searchInput) {
+        searchInput.value = saved.searchQuery;
+      }
+    }
+  }
+  
+  // Save on change
+  const statusGroup = detailEl.querySelector('[data-status-filter]');
+  const searchInput = detailEl.querySelector('[data-sub-search]');
+  
+  const saveFilters = () => {
+    if (domain) {
+      const statusFilters = statusGroup 
+        ? Array.from(statusGroup.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value)
+        : [];
+      const searchQuery = searchInput ? searchInput.value : '';
+      saveReportFilters(domain, { statusFilters, searchQuery });
+    }
+  };
+  
+  if (statusGroup) {
+    statusGroup.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', saveFilters);
+    });
+  }
+  if (searchInput) {
+    searchInput.addEventListener('input', saveFilters);
+  }
+};
 
 renderWorkflowDiagram();
 fetchState();
