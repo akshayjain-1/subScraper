@@ -3011,6 +3011,18 @@ button:hover { background:#1d4ed8; }
 .worker-card .metric { font-size:32px; font-weight:600; }
 .worker-card .muted { margin-top:4px; }
 .worker-progress { margin-top:10px; }
+.workflow-stage { margin-bottom:24px; }
+.workflow-stage-title { font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:#93c5fd; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.workflow-stage-title::before { content:'▸'; color:#3b82f6; }
+.workflow-tools { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.workflow-tool { background:#0b152c; border:1px solid #1f2937; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:500; color:#e2e8f0; display:inline-flex; align-items:center; gap:6px; }
+.workflow-tool.enumeration { border-color:#8b5cf6; background:rgba(139,92,246,0.1); color:#c4b5fd; }
+.workflow-tool.brute-force { border-color:#f59e0b; background:rgba(245,158,11,0.1); color:#fcd34d; }
+.workflow-tool.probing { border-color:#06b6d4; background:rgba(6,182,212,0.1); color:#a5f3fc; }
+.workflow-tool.scanning { border-color:#10b981; background:rgba(16,185,129,0.1); color:#a7f3d0; }
+.workflow-tool.capture { border-color:#6366f1; background:rgba(99,102,241,0.1); color:#c7d2fe; }
+.workflow-arrow { color:#64748b; font-size:18px; }
+.workflow-description { font-size:12px; color:var(--muted); margin-top:8px; margin-left:20px; }
 .btn { display:inline-block; padding:8px 16px; border-radius:8px; background:var(--accent); color:white; font-weight:600; border:none; cursor:pointer; transition:background .2s ease; text-decoration:none; }
 .btn.secondary { background:#1f2937; }
 .btn.small { padding:6px 12px; font-size:13px; }
@@ -3187,6 +3199,11 @@ button:hover { background:#1d4ed8; }
             <div class="label">Known Subdomains</div>
             <div class="value" id="stat-subdomains">0</div>
           </div>
+        </div>
+        <div class="card" style="margin: 24px 0;">
+          <h3>Workflow Pipeline</h3>
+          <p class="muted">Visual representation of how data flows through the reconnaissance tools</p>
+          <div id="workflow-diagram" style="margin-top: 20px;"></div>
         </div>
         <div class="grid-two">
           <div class="card">
@@ -3962,6 +3979,88 @@ function renderTargets(targets) {
   });
   statSubs.textContent = subCount;
   targetsList.innerHTML = cards.join('');
+}
+
+function renderWorkflowDiagram() {
+  const diagram = document.getElementById('workflow-diagram');
+  if (!diagram) return;
+  
+  const html = `
+    <div class="workflow-stage">
+      <div class="workflow-stage-title">Phase 1: Subdomain Enumeration</div>
+      <div class="workflow-tools">
+        <span class="workflow-tool enumeration">Amass</span>
+        <span class="workflow-tool enumeration">Subfinder</span>
+        <span class="workflow-tool enumeration">Assetfinder</span>
+        <span class="workflow-tool enumeration">Findomain</span>
+        <span class="workflow-tool enumeration">Sublist3r</span>
+      </div>
+      <div class="workflow-description">Passive and active subdomain discovery using multiple data sources</div>
+    </div>
+    
+    <div style="text-align:center; margin:16px 0;">
+      <span class="workflow-arrow">↓</span>
+    </div>
+    
+    <div class="workflow-stage">
+      <div class="workflow-stage-title">Phase 2: Subdomain Brute Force</div>
+      <div class="workflow-tools">
+        <span class="workflow-tool brute-force">FFUF</span>
+      </div>
+      <div class="workflow-description">DNS brute-forcing using wordlist to discover additional subdomains</div>
+    </div>
+    
+    <div style="text-align:center; margin:16px 0;">
+      <span class="workflow-arrow">↓</span>
+    </div>
+    
+    <div class="workflow-stage">
+      <div class="workflow-stage-title">Phase 3: HTTP Probing</div>
+      <div class="workflow-tools">
+        <span class="workflow-tool probing">HTTPX</span>
+      </div>
+      <div class="workflow-description">Probe subdomains for live HTTP services and gather response metadata</div>
+    </div>
+    
+    <div style="text-align:center; margin:16px 0;">
+      <span class="workflow-arrow">↓</span>
+    </div>
+    
+    <div class="workflow-stage">
+      <div class="workflow-stage-title">Phase 4: Visual Capture</div>
+      <div class="workflow-tools">
+        <span class="workflow-tool capture">Gowitness</span>
+      </div>
+      <div class="workflow-description">Capture screenshots of live web applications for visual analysis</div>
+    </div>
+    
+    <div style="text-align:center; margin:16px 0;">
+      <span class="workflow-arrow">↓</span>
+    </div>
+    
+    <div class="workflow-stage">
+      <div class="workflow-stage-title">Phase 5: Port Scanning</div>
+      <div class="workflow-tools">
+        <span class="workflow-tool scanning">Nmap</span>
+      </div>
+      <div class="workflow-description">Port and service detection on hosts with live HTTP services</div>
+    </div>
+    
+    <div style="text-align:center; margin:16px 0;">
+      <span class="workflow-arrow">↓</span>
+    </div>
+    
+    <div class="workflow-stage">
+      <div class="workflow-stage-title">Phase 6: Vulnerability Scanning</div>
+      <div class="workflow-tools">
+        <span class="workflow-tool scanning">Nuclei</span>
+        <span class="workflow-tool scanning">Nikto</span>
+      </div>
+      <div class="workflow-description">Automated vulnerability scanning and security checks on discovered targets</div>
+    </div>
+  `;
+  
+  diagram.innerHTML = html;
 }
 
 function renderWorkers(workers) {
@@ -5144,6 +5243,7 @@ if (monitorsList) {
   });
 }
 
+renderWorkflowDiagram();
 fetchState();
 setInterval(fetchState, POLL_INTERVAL);
 </script>
