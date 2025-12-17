@@ -1984,10 +1984,12 @@ def add_completed_job(domain: str, job_data: Dict[str, Any]) -> None:
         job_copy.pop("thread", None)
         
         # Add completion timestamp
-        job_copy["completed_at"] = datetime.now(timezone.utc).isoformat()
+        completion_time = datetime.now(timezone.utc)
+        job_copy["completed_at"] = completion_time.isoformat()
         
-        # Store with a unique key that includes timestamp to allow multiple runs
-        job_key = f"{domain}_{int(time.time())}"
+        # Store with a unique key that includes high-precision timestamp to allow multiple runs
+        # Using timestamp() gives microsecond precision to avoid collisions
+        job_key = f"{domain}_{completion_time.timestamp()}"
         COMPLETED_JOBS[job_key] = job_copy
         
         # Cleanup old completed jobs for this domain
@@ -4165,11 +4167,19 @@ def _start_job_thread(job: Dict[str, Any]) -> None:
             job_set_status(domain, "failed", f"Fatal error: {exc}")
         finally:
             # Save the completed job before removing it from running jobs
+            # Get job data while holding lock, then save outside lock to avoid deadlock
+            job_to_save = None
             with JOB_LOCK:
                 job_record = RUNNING_JOBS.get(domain)
                 if job_record:
-                    add_completed_job(domain, job_record)
+                    # Make a deep copy while we have the lock
+                    job_to_save = copy.deepcopy(job_record)
                 RUNNING_JOBS.pop(domain, None)
+            
+            # Save outside the lock to avoid deadlock (add_completed_job acquires lock)
+            if job_to_save:
+                add_completed_job(domain, job_to_save)
+            
             schedule_jobs()
             cleanup_job_control(domain)
 
