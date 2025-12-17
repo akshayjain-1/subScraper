@@ -9095,6 +9095,12 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/api/backup/download/"):
             backup_filename = unquote(self.path[len("/api/backup/download/"):])
+            
+            # Reject filenames with path traversal sequences
+            if ".." in backup_filename or "/" in backup_filename or "\\" in backup_filename:
+                self.send_error(HTTPStatus.BAD_REQUEST, "Invalid filename")
+                return
+            
             backup_path = BACKUPS_DIR / backup_filename
             
             # Security check: prevent path traversal and symlink attacks
@@ -9102,8 +9108,14 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
                 resolved_backup = backup_path.resolve()
                 resolved_backups_dir = BACKUPS_DIR.resolve()
                 
-                # Check if resolved path is within backups directory
-                if not str(resolved_backup).startswith(str(resolved_backups_dir) + os.sep):
+                # Use is_relative_to if available (Python 3.9+), fallback to string check
+                try:
+                    is_within_dir = resolved_backup.is_relative_to(resolved_backups_dir)
+                except AttributeError:
+                    # Fallback for Python < 3.9
+                    is_within_dir = str(resolved_backup).startswith(str(resolved_backups_dir) + os.sep)
+                
+                if not is_within_dir:
                     raise ValueError("Outside backups dir")
                 
                 # Check if it's a symlink (additional security)
