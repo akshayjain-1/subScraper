@@ -3874,6 +3874,10 @@ def nikto_scan(subs: List[str], domain: str, config: Optional[Dict[str, Any]] = 
     try:
         with open(out_json, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
+        # Log the results summary
+        log(f"Nikto scan complete: {len(results)} findings written to {out_json.name}")
+        if job_domain:
+            job_log_append(job_domain, f"Nikto found {len(results)} total findings across {len(subs)} host(s), saved to {out_json.name}", source="nikto")
     except Exception as e:
         log(f"Error writing Nikto JSON: {e}")
         return None
@@ -4883,6 +4887,8 @@ button:hover { background:#1d4ed8; }
 .log-entry { margin-bottom:8px; }
 .log-meta { color:var(--muted); font-size:11px; margin-bottom:2px; }
 .log-text { margin:0; white-space:pre-wrap; word-break:break-word; }
+.log-file-link { color:#60a5fa; text-decoration:underline; cursor:pointer; }
+.log-file-link:hover { color:#93c5fd; }
 .job-actions { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
 .queue-card { display:flex; flex-direction:column; gap:8px; }
 .queue-row { display:flex; justify-content:space-between; align-items:center; }
@@ -6016,16 +6022,31 @@ function renderProgress(value, status) {
   return `<div class="progress-bar"><div class="progress-inner ${statusClass(status)}" style="width:${width}%"></div></div>`;
 }
 
+function linkifyLogText(text) {
+  // Escape the text first
+  const escaped = escapeHtml(text || '');
+  
+  // Pattern to match result file names (nikto_*.json, nuclei_*.json, nmap_*.json, etc.)
+  const filePattern = /(nikto_[a-zA-Z0-9._-]+\.json|nuclei_[a-zA-Z0-9._-]+\.json|nmap_[a-zA-Z0-9._-]+\.json|httpx_[a-zA-Z0-9._-]+\.json|ffuf_[a-zA-Z0-9._-]+\.json)/g;
+  
+  // Replace file references with download links
+  return escaped.replace(filePattern, (match) => {
+    // Create a download link for the JSON file using the /results/ endpoint
+    return `<a href="/results/${match}" download="${match}" class="log-file-link" title="Download ${match}">${match}</a>`;
+  });
+}
+
 function renderLogEntries(logs) {
   const safeLogs = Array.isArray(logs) ? logs : [];
   if (!safeLogs.length) {
     return '<p class="muted">No output yet.</p>';
   }
   return safeLogs.slice(-200).map(entry => {
+    const linkedText = linkifyLogText(entry.text || '');
     return `
       <div class="log-entry">
         <div class="log-meta">${fmtTime(entry.ts)} — ${escapeHtml(entry.source || 'app')}</div>
-        <pre class="log-text">${escapeHtml(entry.text || '')}</pre>
+        <pre class="log-text">${linkedText}</pre>
       </div>
     `;
   }).join('');
@@ -7594,6 +7615,20 @@ function attachSeverityFilter(wrapper, table) {
   if (!wrapper || !table) return;
   const checkboxes = wrapper.querySelectorAll('input[type="checkbox"]');
   if (!checkboxes.length) return;
+  
+  // Generate a unique ID for this filter set based on table ID and wrapper attributes
+  const tableId = table.id || '';
+  const filterId = `severity_filter_${tableId}`;
+  
+  // Restore saved checkbox states
+  checkboxes.forEach((cb, index) => {
+    const cbId = `${filterId}_${cb.value}_${index}`;
+    const saved = loadCheckboxState(cbId);
+    if (saved !== null) {
+      cb.checked = saved;
+    }
+  });
+  
   const apply = () => {
     const allowed = new Set(Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value));
     const rows = table.tBodies[0] ? Array.from(table.tBodies[0].rows) : [];
@@ -7603,7 +7638,15 @@ function attachSeverityFilter(wrapper, table) {
     });
     refreshPagination(table);
   };
-  checkboxes.forEach(cb => cb.addEventListener('change', apply));
+  
+  checkboxes.forEach((cb, index) => {
+    const cbId = `${filterId}_${cb.value}_${index}`;
+    cb.addEventListener('change', () => {
+      saveCheckboxState(cbId, cb.checked);
+      apply();
+    });
+  });
+  
   apply();
 }
 
@@ -7796,7 +7839,41 @@ document.addEventListener('click', (event) => {
   if (!container.classList.contains('open')) {
     body.scrollTop = 0;
   }
+  
+  // Save collapsible state to localStorage
+  const collapsibleId = container.getAttribute('data-collapsible');
+  if (collapsibleId) {
+    saveCollapsibleState(collapsibleId, container.classList.contains('open'));
+  }
 });
+
+// Functions to manage collapsible state
+function saveCollapsibleState(id, isOpen) {
+  try {
+    localStorage.setItem(`collapsible_${id}`, isOpen ? '1' : '0');
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
+function loadCollapsibleState(id) {
+  try {
+    const saved = localStorage.getItem(`collapsible_${id}`);
+    return saved === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function restoreAllCollapsibleStates() {
+  const collapsibles = document.querySelectorAll('.collapsible[data-collapsible]');
+  collapsibles.forEach(container => {
+    const id = container.getAttribute('data-collapsible');
+    if (id && loadCollapsibleState(id)) {
+      container.classList.add('open');
+    }
+  });
+}
 function renderSettings(config, tools) {
   settingsSummary.innerHTML = `
     <div class="paths-grid">
@@ -7901,6 +7978,9 @@ async function fetchState() {
     
     // Fetch and render system resources
     await fetchSystemResources();
+    
+    // Restore collapsible states after rendering
+    restoreAllCollapsibleStates();
     
     // Update logs view if visible
     const logsSection = document.querySelector('[data-view="logs"]');
@@ -8526,7 +8606,8 @@ function saveCheckboxState(id, checked) {
 function loadCheckboxState(id, defaultValue = false) {
   try {
     const saved = localStorage.getItem(`checkbox_${id}`);
-    return saved === '1' ? true : saved === '0' ? false : defaultValue;
+    if (saved === null) return defaultValue;
+    return saved === '1' ? true : false;
   } catch (e) {
     return defaultValue;
   }
@@ -9726,6 +9807,46 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             data = requested.read_bytes()
             self._send_bytes(data, status=HTTPStatus.OK, content_type=mime or "application/octet-stream")
             return
+        
+        # Serve scan result files (nikto, nuclei, nmap, httpx JSON files)
+        if self.path.startswith("/results/"):
+            rel_path = unquote(self.path[len("/results/"):]).lstrip("/")
+            if not rel_path:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
+                return
+            
+            # Security: only allow JSON files with specific prefixes
+            allowed_prefixes = ["nikto_", "nuclei_", "nmap_", "httpx_", "ffuf_"]
+            if not any(rel_path.startswith(prefix) and rel_path.endswith(".json") for prefix in allowed_prefixes):
+                self.send_error(HTTPStatus.FORBIDDEN, "Forbidden")
+                return
+            
+            requested = (DATA_DIR / rel_path).resolve()
+            base = DATA_DIR.resolve()
+            try:
+                # Prevent path traversal
+                if not str(requested).startswith(str(base)):
+                    raise ValueError("Outside data dir")
+                # Prevent symlink attacks
+                if requested.is_symlink():
+                    raise ValueError("Symlinks not allowed")
+            except Exception:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
+                return
+            
+            if not requested.exists() or not requested.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
+                return
+            
+            data = requested.read_bytes()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f'attachment; filename="{rel_path}"')
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        
         if self.path.startswith("/api/history/commands"):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
