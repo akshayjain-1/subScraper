@@ -382,6 +382,120 @@ def ensure_dirs() -> None:
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def atomic_write_json(filepath: Path, data: Dict[str, Any], indent: int = 2) -> None:
+    """
+    Atomically write JSON data to a file using a temporary file.
+    This prevents corruption if the process crashes during write.
+    Includes proper error handling for race conditions and filesystem issues.
+    """
+    # Ensure parent directory exists
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create temp file in same directory to ensure same filesystem
+    # This is important for atomic rename to work properly
+    tmp_path = filepath.with_suffix(f".tmp.{os.getpid()}")
+    
+    try:
+        # Write data to temporary file
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=indent, sort_keys=True)
+            # Sync to disk (flush OS buffers) while file is still open
+            # This ensures data is written before rename
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except (OSError, AttributeError):
+                # fsync may not be supported on all platforms/filesystems
+                pass
+        
+        # Atomic rename - this is the critical operation
+        # On most systems, this is atomic if both files are on same filesystem
+        try:
+            tmp_path.replace(filepath)
+        except OSError as e:
+            # If replace fails, try alternative methods
+            log(f"Warning: atomic replace failed for {filepath}: {e}. Trying fallback...")
+            
+            # Try direct rename (less safe but may work)
+            if filepath.exists():
+                backup_path = filepath.with_suffix(".backup")
+                try:
+                    shutil.copy2(filepath, backup_path)
+                except Exception:
+                    pass
+            
+            shutil.move(str(tmp_path), str(filepath))
+    
+    except Exception as e:
+        # Clean up temp file on any error
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        raise RuntimeError(f"Failed to write {filepath}: {e}") from e
+    
+    finally:
+        # Ensure temp file is cleaned up even if something went wrong
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                # Don't fail if cleanup fails
+                pass
+
+
+def atomic_write_text(filepath: Path, content: str) -> None:
+    """
+    Atomically write text content to a file using a temporary file.
+    Similar to atomic_write_json but for text files.
+    """
+    # Ensure parent directory exists
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create temp file in same directory to ensure same filesystem
+    tmp_path = filepath.with_suffix(f".tmp.{os.getpid()}")
+    
+    try:
+        # Write content to temporary file
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(content)
+            # Sync to disk while file is still open
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except (OSError, AttributeError):
+                pass
+        
+        # Atomic rename
+        try:
+            tmp_path.replace(filepath)
+        except OSError as e:
+            log(f"Warning: atomic replace failed for {filepath}: {e}. Trying fallback...")
+            if filepath.exists():
+                backup_path = filepath.with_suffix(".backup")
+                try:
+                    shutil.copy2(filepath, backup_path)
+                except Exception:
+                    pass
+            shutil.move(str(tmp_path), str(filepath))
+    
+    except Exception as e:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        raise RuntimeError(f"Failed to write {filepath}: {e}") from e
+    
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+
+
 def _normalize_tool_flag_templates(value: Any) -> Dict[str, str]:
     mapping = {name: "" for name in TEMPLATE_AWARE_TOOLS}
     if not isinstance(value, dict):
@@ -593,6 +707,7 @@ def default_config() -> Dict[str, Any]:
         "auto_backup_enabled": False,
         "auto_backup_interval": 3600,
         "auto_backup_max_count": 10,
+        "setup_completed": False,
     }
 
 
@@ -620,10 +735,7 @@ def load_monitors_state() -> Dict[str, Any]:
 
 def _save_monitors_locked() -> None:
     payload = {"monitors": MONITOR_STATE}
-    tmp_path = MONITORS_FILE.with_suffix(".tmp")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, sort_keys=True)
-    tmp_path.replace(MONITORS_FILE)
+    atomic_write_json(MONITORS_FILE, payload)
 
 
 def save_monitors_state() -> None:
@@ -1061,10 +1173,7 @@ def save_system_resource_state() -> None:
             "current": SYSTEM_RESOURCE_STATE,
             "history": SYSTEM_RESOURCE_HISTORY[-SYSTEM_RESOURCE_HISTORY_SIZE:],
         }
-        tmp_path = SYSTEM_RESOURCE_FILE.with_suffix(".tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, sort_keys=True)
-        tmp_path.replace(SYSTEM_RESOURCE_FILE)
+        atomic_write_json(SYSTEM_RESOURCE_FILE, payload)
 
 
 def load_system_resource_state() -> Dict[str, Any]:
@@ -1596,10 +1705,7 @@ def get_auto_backup_status() -> Dict[str, Any]:
 
 def save_config(cfg: Dict[str, Any]) -> None:
     ensure_dirs()
-    tmp_path = CONFIG_FILE.with_suffix(".tmp")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2, sort_keys=True)
-    tmp_path.replace(CONFIG_FILE)
+    atomic_write_json(CONFIG_FILE, cfg)
     with CONFIG_LOCK:
         CONFIG.clear()
         CONFIG.update(cfg)
@@ -1925,10 +2031,7 @@ def save_state(state: Dict[str, Any]) -> None:
     state["last_updated"] = datetime.now(timezone.utc).isoformat()
     acquire_lock()
     try:
-        tmp_path = STATE_FILE.with_suffix(".tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2, sort_keys=True)
-        tmp_path.replace(STATE_FILE)
+        atomic_write_json(STATE_FILE, state)
     finally:
         release_lock()
     try:
@@ -1965,10 +2068,7 @@ def save_completed_jobs() -> None:
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "jobs": jobs_to_save,
         }
-        tmp_path = COMPLETED_JOBS_FILE.with_suffix(".tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, sort_keys=True)
-        tmp_path.replace(COMPLETED_JOBS_FILE)
+        atomic_write_json(COMPLETED_JOBS_FILE, payload)
     except Exception as e:
         log(f"Error saving completed_jobs.json: {e}")
 
@@ -2182,13 +2282,318 @@ def ensure_required_tools() -> None:
         ensure_tool_installed(name)
 
 
+# ================== FIRST-RUN SETUP WIZARD ==================
+
+def run_setup_wizard() -> None:
+    """
+    Interactive first-run setup wizard to configure all settings and API keys.
+    This prevents the program from freezing during execution by collecting all
+    required information upfront.
+    """
+    print("\n" + "="*70)
+    print("    🚀 WELCOME TO SUBSCRAPER - FIRST RUN SETUP WIZARD")
+    print("="*70)
+    print("\nThis wizard will help you configure subScraper for optimal performance.")
+    print("You can skip any setting by pressing Enter (defaults will be used).")
+    print("You can always change these settings later in the web UI.\n")
+    
+    config = get_config()
+    
+    # Basic Settings
+    print("\n" + "-"*70)
+    print("📋 BASIC SETTINGS")
+    print("-"*70)
+    
+    # Wordlist configuration
+    print("\n1. Default Wordlist for Subdomain Brute-Force (ffuf)")
+    print("   Recommended: Download a wordlist like SecLists subdomains-top1million-5000.txt")
+    current_wordlist = config.get("default_wordlist", "")
+    if current_wordlist:
+        print(f"   Current: {current_wordlist}")
+    try:
+        wordlist = input("   Enter wordlist path (or press Enter to skip): ").strip()
+        if wordlist and Path(wordlist).exists():
+            config["default_wordlist"] = wordlist
+            print(f"   ✓ Wordlist set to: {wordlist}")
+        elif wordlist:
+            print(f"   ⚠ Warning: File not found: {wordlist}. You can set this later.")
+            config["default_wordlist"] = wordlist
+        else:
+            print("   ⏭ Skipped (you can add this later in Settings)")
+    except (EOFError, KeyboardInterrupt):
+        print("\n   ⏭ Skipped")
+    
+    # Concurrency settings
+    print("\n2. Concurrent Jobs")
+    print(f"   Current: {config.get('max_running_jobs', 1)}")
+    print("   How many scans should run simultaneously? (1-10 recommended)")
+    try:
+        jobs = input("   Enter number (or press Enter for default): ").strip()
+        if jobs:
+            config["max_running_jobs"] = max(1, min(20, int(jobs)))
+            print(f"   ✓ Set to: {config['max_running_jobs']} concurrent jobs")
+        else:
+            print("   ⏭ Using default: 1")
+    except (ValueError, EOFError, KeyboardInterrupt):
+        print("   ⏭ Using default: 1")
+    
+    # Nikto settings
+    print("\n3. Skip Nikto by Default?")
+    print("   Nikto scans can be slow. Skip them unless explicitly needed?")
+    try:
+        skip = input("   Skip Nikto? (y/N): ").strip().lower()
+        config["skip_nikto_by_default"] = (skip == 'y')
+        print(f"   ✓ {'Will skip' if config['skip_nikto_by_default'] else 'Will run'} Nikto by default")
+    except (EOFError, KeyboardInterrupt):
+        print("   ⏭ Using default: Run Nikto")
+    
+    # API Keys Configuration
+    print("\n" + "-"*70)
+    print("🔑 API KEYS SETUP")
+    print("-"*70)
+    print("\nMany tools work better with API keys for better results and rate limits.")
+    print("You can skip these and add them later, but adding them now is recommended.\n")
+    
+    # Amass API keys
+    print("4. Amass Configuration")
+    print("   Amass supports multiple data sources with API keys:")
+    print("   - Shodan, VirusTotal, SecurityTrails, Censys, PassiveTotal, etc.")
+    
+    amass_config_dir = Path.home() / ".config" / "amass"
+    amass_config_file = amass_config_dir / "config.ini"
+    
+    if amass_config_file.exists():
+        print(f"   ✓ Amass config already exists at: {amass_config_file}")
+        try:
+            update = input("   Update Amass API keys? (y/N): ").strip().lower()
+            if update != 'y':
+                print("   ⏭ Keeping existing Amass config")
+            else:
+                setup_amass_config(amass_config_dir, amass_config_file)
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Keeping existing Amass config")
+    else:
+        try:
+            setup = input("   Configure Amass API keys now? (Y/n): ").strip().lower()
+            if setup == 'n':
+                print("   ⏭ Skipped Amass setup")
+            else:
+                setup_amass_config(amass_config_dir, amass_config_file)
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Skipped Amass setup")
+    
+    # Subfinder API keys
+    print("\n5. Subfinder Configuration")
+    print("   Subfinder also supports various API sources.")
+    subfinder_config_dir = Path.home() / ".config" / "subfinder"
+    subfinder_config_file = subfinder_config_dir / "provider-config.yaml"
+    
+    if subfinder_config_file.exists():
+        print(f"   ✓ Subfinder config already exists at: {subfinder_config_file}")
+        try:
+            update = input("   Update Subfinder API keys? (y/N): ").strip().lower()
+            if update == 'y':
+                setup_subfinder_config(subfinder_config_dir, subfinder_config_file)
+            else:
+                print("   ⏭ Keeping existing Subfinder config")
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Keeping existing Subfinder config")
+    else:
+        try:
+            setup = input("   Configure Subfinder API keys now? (Y/n): ").strip().lower()
+            if setup == 'n':
+                print("   ⏭ Skipped Subfinder setup")
+            else:
+                setup_subfinder_config(subfinder_config_dir, subfinder_config_file)
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Skipped Subfinder setup")
+    
+    # Save configuration
+    print("\n" + "-"*70)
+    print("💾 SAVING CONFIGURATION")
+    print("-"*70)
+    
+    config["setup_completed"] = True
+    save_config(config)
+    print("✓ Configuration saved successfully!")
+    
+    # Display summary and next steps
+    print("\n" + "="*70)
+    print("✅ SETUP COMPLETE!")
+    print("="*70)
+    print("\n📊 Configuration Summary:")
+    print(f"   • Wordlist: {config.get('default_wordlist') or 'Not configured (optional)'}")
+    print(f"   • Concurrent Jobs: {config.get('max_running_jobs', 1)}")
+    print(f"   • Skip Nikto: {'Yes' if config.get('skip_nikto_by_default') else 'No'}")
+    print(f"   • Amass Config: {'✓ Configured' if amass_config_file.exists() else '⏭ Skipped'}")
+    print(f"   • Subfinder Config: {'✓ Configured' if subfinder_config_file.exists() else '⏭ Skipped'}")
+    
+    print("\n" + "-"*70)
+    print("🚀 NEXT STEPS TO GET THE FULL PROGRAM WORKING")
+    print("-"*70)
+    print("\n1. VERIFY TOOLS INSTALLATION")
+    print("   All required tools should be installed automatically.")
+    print("   If any tool is missing, install it manually:")
+    print("   - amass, subfinder, assetfinder, findomain, sublist3r")
+    print("   - ffuf, httpx, nuclei, nikto, gowitness, nmap")
+    print("   - waybackurls, gau, dnsx")
+    
+    print("\n2. INSTALL PYTHON DEPENDENCIES (if not already done)")
+    print("   $ pip3 install -r requirements.txt")
+    
+    print("\n3. START THE WEB SERVER")
+    print("   $ python3 main.py")
+    print("   Then open: http://127.0.0.1:8342")
+    
+    print("\n4. OR RUN A DIRECT SCAN")
+    print("   $ python3 main.py example.com --wordlist /path/to/wordlist.txt")
+    
+    print("\n5. CONFIGURE MORE SETTINGS (optional)")
+    print("   • Open the web UI → Settings tab")
+    print("   • Configure tool-specific flags and templates")
+    print("   • Set up monitoring feeds")
+    print("   • Enable dynamic queue management")
+    print("   • Configure auto-backup")
+    
+    print("\n6. DOWNLOAD A WORDLIST (if you haven't)")
+    print("   Popular options:")
+    print("   • SecLists: https://github.com/danielmiessler/SecLists")
+    print("   • DNS wordlists: subdomains-top1million-5000.txt")
+    
+    print("\n" + "="*70)
+    print("📚 For more information:")
+    print("   • README.md - Full documentation")
+    print("   • QUICKSTART.md - Quick start guide")
+    print("   • Web UI Settings - Configure everything through the interface")
+    print("="*70 + "\n")
+
+
+def setup_amass_config(config_dir: Path, config_file: Path) -> None:
+    """Setup Amass configuration with API keys."""
+    config_dir.mkdir(parents=True, exist_ok=True)
+    
+    providers = {
+        "shodan": "Shodan API (https://account.shodan.io/)",
+        "virustotal": "VirusTotal API (https://www.virustotal.com/gui/my-apikey)",
+        "securitytrails": "SecurityTrails API (https://securitytrails.com/app/account/credentials)",
+        "censys": "Censys API (https://search.censys.io/account/api)",
+        "passivetotal": "PassiveTotal/RiskIQ API (https://community.riskiq.com/settings)",
+        "binaryedge": "BinaryEdge API (https://app.binaryedge.io/account/api)",
+        "bevigil": "BeVigil API (https://bevigil.com/osint-api)",
+    }
+    
+    api_keys = {}
+    print("\n   Press Enter to skip any provider.")
+    for name, description in providers.items():
+        print(f"\n   {description}")
+        try:
+            key = input(f"   Enter API key for {name} (or press Enter to skip): ").strip()
+            if key:
+                api_keys[name] = key
+                print(f"   ✓ {name} API key saved")
+        except (EOFError, KeyboardInterrupt):
+            break
+    
+    # Write config.ini
+    lines = [
+        "# Generated by subScraper setup wizard",
+        "# You can edit this file later to add more API keys",
+        "[resolvers]",
+        "resolver = 1.1.1.1",
+        "resolver = 8.8.8.8",
+        "",
+        "[scope]",
+        "# Add scope settings here if needed",
+        "",
+        "[datasources]",
+    ]
+    
+    for name, key in api_keys.items():
+        lines.append(f"[datasources.{name}]")
+        lines.append(f"[datasources.{name}.Credentials]")
+        lines.append(f"apikey = {key}")
+        lines.append("")
+    
+    # Add commented templates for providers not configured
+    for name in providers.keys():
+        if name not in api_keys:
+            lines.append(f"# [{name}]")
+            lines.append(f"# [datasources.{name}.Credentials]")
+            lines.append("# apikey = YOUR_KEY_HERE")
+            lines.append("")
+    
+    atomic_write_text(config_file, "\n".join(lines))
+    print(f"\n   ✓ Amass config created at: {config_file}")
+    if api_keys:
+        print(f"   ✓ Configured {len(api_keys)} API key(s)")
+    else:
+        print("   ⏭ No API keys configured (you can add them later)")
+
+
+def setup_subfinder_config(config_dir: Path, config_file: Path) -> None:
+    """Setup Subfinder configuration with API keys."""
+    config_dir.mkdir(parents=True, exist_ok=True)
+    
+    providers = {
+        "shodan": "Shodan API",
+        "censys": "Censys API",
+        "virustotal": "VirusTotal API",
+        "binaryedge": "BinaryEdge API",
+        "securitytrails": "SecurityTrails API",
+        "passivetotal": "PassiveTotal API",
+        "github": "GitHub Personal Access Token",
+    }
+    
+    api_keys = {}
+    print("\n   Press Enter to skip any provider.")
+    for name, description in providers.items():
+        try:
+            key = input(f"   Enter {description} (or press Enter to skip): ").strip()
+            if key:
+                api_keys[name] = key
+                print(f"   ✓ {name} saved")
+        except (EOFError, KeyboardInterrupt):
+            break
+    
+    # Create YAML config
+    lines = ["# Generated by subScraper setup wizard"]
+    for name, key in api_keys.items():
+        lines.append(f"{name}: [{key}]")
+    
+    if not api_keys:
+        lines.append("# Add your API keys here")
+        lines.append("# Format: provider: [api_key]")
+        lines.append("# Example:")
+        lines.append("# shodan: [your_api_key_here]")
+    
+    atomic_write_text(config_file, "\n".join(lines))
+    print(f"\n   ✓ Subfinder config created at: {config_file}")
+    if api_keys:
+        print(f"   ✓ Configured {len(api_keys)} API key(s)")
+    else:
+        print("   ⏭ No API keys configured (you can add them later)")
+
+
 # ================== AMASS CONFIG ==================
 
 def ensure_amass_config_interactive() -> None:
     """
     If no amass config is found, optionally ask user if they want a basic template
     and (optionally) enter some keys.
+    NOTE: This is only called during pipeline execution if setup was not completed.
+    The main setup wizard handles this during first run.
     """
+    # Check if setup was completed - if so, don't block with interactive prompts
+    cfg = get_config()
+    if cfg.get("setup_completed", False):
+        # Setup was completed, don't prompt during execution
+        config_dir = Path.home() / ".config" / "amass"
+        config_file = config_dir / "config.ini"
+        if not config_file.exists():
+            log("Amass config not found, but setup was completed. Skipping interactive prompt.")
+            log("You can configure Amass API keys later through the web UI or by editing ~/.config/amass/config.ini")
+        return
+    
     config_dir = Path.home() / ".config" / "amass"
     config_file = config_dir / "config.ini"
 
@@ -2248,7 +2653,7 @@ def ensure_amass_config_interactive() -> None:
             lines.append("    #apikey = YOUR_KEY_HERE")
             lines.append("")
 
-    config_file.write_text("\n".join(lines), encoding="utf-8")
+    atomic_write_text(config_file, "\n".join(lines))
     log(f"Amass config created at {config_file}. You can tweak it later if needed.")
 
 
@@ -2274,6 +2679,39 @@ def run_subprocess(
         job_log_append(job_domain, f"$ {display_cmd}", source=step or "command")
     try:
         merged_env = os.environ.copy()
+        
+        # Set environment variables to prevent interactive prompts from various tools
+        # These ensure tools run in non-interactive mode and don't freeze waiting for input
+        non_interactive_env = {
+            # General non-interactive settings
+            "DEBIAN_FRONTEND": "noninteractive",
+            "TERM": "dumb",
+            "CI": "true",  # Many tools detect CI environments and disable interactive features
+            
+            # Subfinder - prevent interactive config creation
+            "SUBFINDER_CONFIG_PATH": str(Path.home() / ".config" / "subfinder" / "provider-config.yaml"),
+            
+            # Nuclei - prevent interactive prompts and template updates
+            "NUCLEI_NONINTERACTIVE": "1",
+            "NUCLEI_NO_COLOR": "1",
+            
+            # Amass - already handled via config file but ensure non-interactive
+            "AMASS_CONFIG": str(Path.home() / ".config" / "amass" / "config.ini"),
+            
+            # GitHub CLI / github-subdomains - prevent auth prompts
+            "GH_NO_UPDATE_NOTIFIER": "1",
+            "GH_PAGER": "",
+            
+            # General tool settings to prevent prompts
+            "PAGER": "",
+            "MANPAGER": "",
+            "NO_COLOR": "1",
+        }
+        
+        # Apply non-interactive environment
+        merged_env.update(non_interactive_env)
+        
+        # Apply any custom environment variables passed in
         if env:
             merged_env.update({k: str(v) for k, v in env.items()})
 
@@ -2285,6 +2723,7 @@ def run_subprocess(
             check=False,
             env=merged_env,
             timeout=timeout,
+            stdin=subprocess.DEVNULL,  # Prevent reading from stdin - critical for non-interactive mode
         )
 
         stdout = result.stdout or ""
@@ -3916,10 +4355,7 @@ def generate_html_dashboard(state: Optional[Dict[str, Any]] = None) -> None:
 
     acquire_lock()
     try:
-        tmp = HTML_DASHBOARD_FILE.with_suffix(".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write("\n".join(html_parts))
-        tmp.replace(HTML_DASHBOARD_FILE)
+        atomic_write_text(HTML_DASHBOARD_FILE, "\n".join(html_parts))
     finally:
         release_lock()
 
@@ -9542,10 +9978,41 @@ def main():
         default=8342,
         help="Port for the web UI (default: 8342)."
     )
+    parser.add_argument(
+        "--skip-setup",
+        action="store_true",
+        help="Skip the first-run setup wizard (not recommended for first run)."
+    )
 
     args = parser.parse_args()
 
     ensure_dirs()
+    
+    # Check if this is the first run and run setup wizard
+    cfg = get_config()
+    setup_completed = cfg.get("setup_completed", False)
+    
+    if not setup_completed and not args.skip_setup:
+        # Only run setup wizard in interactive mode
+        if sys.stdin.isatty():
+            try:
+                run_setup_wizard()
+                # Reload config after setup
+                cfg = get_config()
+            except KeyboardInterrupt:
+                print("\n\nSetup interrupted by user.")
+                print("You can run the setup wizard again next time,")
+                print("or configure settings through the web UI.")
+                print("\nContinuing with default settings...\n")
+                # Mark setup as completed so we don't prompt again
+                cfg["setup_completed"] = True
+                save_config(cfg)
+        else:
+            log("First run detected but running in non-interactive mode.")
+            log("Skipping setup wizard. You can configure settings through the web UI.")
+            cfg["setup_completed"] = True
+            save_config(cfg)
+    
     ensure_required_tools()
 
     if args.domain:
