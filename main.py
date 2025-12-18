@@ -5624,7 +5624,7 @@ virustotal: [YOUR_VIRUSTOTAL_KEY_HERE]</pre>
                 </ol>
               </div>
 
-              <div style="background: #16a34a; background: rgba(22, 163, 74, 0.1); border: 1px solid #16a34a; border-radius: 12px; padding: 16px; margin-top: 24px;">
+              <div style="background: rgba(22, 163, 74, 0.1); border: 1px solid #16a34a; border-radius: 12px; padding: 16px; margin-top: 24px;">
                 <h5 style="margin: 0 0 8px 0; color: #86efac;">💡 Pro Tips</h5>
                 <ul style="margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px;">
                   <li style="margin-bottom: 8px;">Start with free tiers - you can discover many subdomains without paying</li>
