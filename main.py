@@ -593,6 +593,7 @@ def default_config() -> Dict[str, Any]:
         "auto_backup_enabled": False,
         "auto_backup_interval": 3600,
         "auto_backup_max_count": 10,
+        "setup_completed": False,
     }
 
 
@@ -2182,13 +2183,318 @@ def ensure_required_tools() -> None:
         ensure_tool_installed(name)
 
 
+# ================== FIRST-RUN SETUP WIZARD ==================
+
+def run_setup_wizard() -> None:
+    """
+    Interactive first-run setup wizard to configure all settings and API keys.
+    This prevents the program from freezing during execution by collecting all
+    required information upfront.
+    """
+    print("\n" + "="*70)
+    print("    🚀 WELCOME TO SUBSCRAPER - FIRST RUN SETUP WIZARD")
+    print("="*70)
+    print("\nThis wizard will help you configure subScraper for optimal performance.")
+    print("You can skip any setting by pressing Enter (defaults will be used).")
+    print("You can always change these settings later in the web UI.\n")
+    
+    config = get_config()
+    
+    # Basic Settings
+    print("\n" + "-"*70)
+    print("📋 BASIC SETTINGS")
+    print("-"*70)
+    
+    # Wordlist configuration
+    print("\n1. Default Wordlist for Subdomain Brute-Force (ffuf)")
+    print("   Recommended: Download a wordlist like SecLists subdomains-top1million-5000.txt")
+    current_wordlist = config.get("default_wordlist", "")
+    if current_wordlist:
+        print(f"   Current: {current_wordlist}")
+    try:
+        wordlist = input("   Enter wordlist path (or press Enter to skip): ").strip()
+        if wordlist and Path(wordlist).exists():
+            config["default_wordlist"] = wordlist
+            print(f"   ✓ Wordlist set to: {wordlist}")
+        elif wordlist:
+            print(f"   ⚠ Warning: File not found: {wordlist}. You can set this later.")
+            config["default_wordlist"] = wordlist
+        else:
+            print("   ⏭ Skipped (you can add this later in Settings)")
+    except (EOFError, KeyboardInterrupt):
+        print("\n   ⏭ Skipped")
+    
+    # Concurrency settings
+    print("\n2. Concurrent Jobs")
+    print(f"   Current: {config.get('max_running_jobs', 1)}")
+    print("   How many scans should run simultaneously? (1-10 recommended)")
+    try:
+        jobs = input("   Enter number (or press Enter for default): ").strip()
+        if jobs:
+            config["max_running_jobs"] = max(1, min(20, int(jobs)))
+            print(f"   ✓ Set to: {config['max_running_jobs']} concurrent jobs")
+        else:
+            print("   ⏭ Using default: 1")
+    except (ValueError, EOFError, KeyboardInterrupt):
+        print("   ⏭ Using default: 1")
+    
+    # Nikto settings
+    print("\n3. Skip Nikto by Default?")
+    print("   Nikto scans can be slow. Skip them unless explicitly needed?")
+    try:
+        skip = input("   Skip Nikto? (y/N): ").strip().lower()
+        config["skip_nikto_by_default"] = (skip == 'y')
+        print(f"   ✓ {'Will skip' if config['skip_nikto_by_default'] else 'Will run'} Nikto by default")
+    except (EOFError, KeyboardInterrupt):
+        print("   ⏭ Using default: Run Nikto")
+    
+    # API Keys Configuration
+    print("\n" + "-"*70)
+    print("🔑 API KEYS SETUP")
+    print("-"*70)
+    print("\nMany tools work better with API keys for better results and rate limits.")
+    print("You can skip these and add them later, but adding them now is recommended.\n")
+    
+    # Amass API keys
+    print("4. Amass Configuration")
+    print("   Amass supports multiple data sources with API keys:")
+    print("   - Shodan, VirusTotal, SecurityTrails, Censys, PassiveTotal, etc.")
+    
+    amass_config_dir = Path.home() / ".config" / "amass"
+    amass_config_file = amass_config_dir / "config.ini"
+    
+    if amass_config_file.exists():
+        print(f"   ✓ Amass config already exists at: {amass_config_file}")
+        try:
+            update = input("   Update Amass API keys? (y/N): ").strip().lower()
+            if update != 'y':
+                print("   ⏭ Keeping existing Amass config")
+            else:
+                setup_amass_config(amass_config_dir, amass_config_file)
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Keeping existing Amass config")
+    else:
+        try:
+            setup = input("   Configure Amass API keys now? (Y/n): ").strip().lower()
+            if setup == 'n':
+                print("   ⏭ Skipped Amass setup")
+            else:
+                setup_amass_config(amass_config_dir, amass_config_file)
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Skipped Amass setup")
+    
+    # Subfinder API keys
+    print("\n5. Subfinder Configuration")
+    print("   Subfinder also supports various API sources.")
+    subfinder_config_dir = Path.home() / ".config" / "subfinder"
+    subfinder_config_file = subfinder_config_dir / "provider-config.yaml"
+    
+    if subfinder_config_file.exists():
+        print(f"   ✓ Subfinder config already exists at: {subfinder_config_file}")
+        try:
+            update = input("   Update Subfinder API keys? (y/N): ").strip().lower()
+            if update == 'y':
+                setup_subfinder_config(subfinder_config_dir, subfinder_config_file)
+            else:
+                print("   ⏭ Keeping existing Subfinder config")
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Keeping existing Subfinder config")
+    else:
+        try:
+            setup = input("   Configure Subfinder API keys now? (Y/n): ").strip().lower()
+            if setup == 'n':
+                print("   ⏭ Skipped Subfinder setup")
+            else:
+                setup_subfinder_config(subfinder_config_dir, subfinder_config_file)
+        except (EOFError, KeyboardInterrupt):
+            print("   ⏭ Skipped Subfinder setup")
+    
+    # Save configuration
+    print("\n" + "-"*70)
+    print("💾 SAVING CONFIGURATION")
+    print("-"*70)
+    
+    config["setup_completed"] = True
+    save_config(config)
+    print("✓ Configuration saved successfully!")
+    
+    # Display summary and next steps
+    print("\n" + "="*70)
+    print("✅ SETUP COMPLETE!")
+    print("="*70)
+    print("\n📊 Configuration Summary:")
+    print(f"   • Wordlist: {config.get('default_wordlist') or 'Not configured (optional)'}")
+    print(f"   • Concurrent Jobs: {config.get('max_running_jobs', 1)}")
+    print(f"   • Skip Nikto: {'Yes' if config.get('skip_nikto_by_default') else 'No'}")
+    print(f"   • Amass Config: {'✓ Configured' if amass_config_file.exists() else '⏭ Skipped'}")
+    print(f"   • Subfinder Config: {'✓ Configured' if subfinder_config_file.exists() else '⏭ Skipped'}")
+    
+    print("\n" + "-"*70)
+    print("🚀 NEXT STEPS TO GET THE FULL PROGRAM WORKING")
+    print("-"*70)
+    print("\n1. VERIFY TOOLS INSTALLATION")
+    print("   All required tools should be installed automatically.")
+    print("   If any tool is missing, install it manually:")
+    print("   - amass, subfinder, assetfinder, findomain, sublist3r")
+    print("   - ffuf, httpx, nuclei, nikto, gowitness, nmap")
+    print("   - waybackurls, gau, dnsx")
+    
+    print("\n2. INSTALL PYTHON DEPENDENCIES (if not already done)")
+    print("   $ pip3 install -r requirements.txt")
+    
+    print("\n3. START THE WEB SERVER")
+    print("   $ python3 main.py")
+    print("   Then open: http://127.0.0.1:8342")
+    
+    print("\n4. OR RUN A DIRECT SCAN")
+    print("   $ python3 main.py example.com --wordlist /path/to/wordlist.txt")
+    
+    print("\n5. CONFIGURE MORE SETTINGS (optional)")
+    print("   • Open the web UI → Settings tab")
+    print("   • Configure tool-specific flags and templates")
+    print("   • Set up monitoring feeds")
+    print("   • Enable dynamic queue management")
+    print("   • Configure auto-backup")
+    
+    print("\n6. DOWNLOAD A WORDLIST (if you haven't)")
+    print("   Popular options:")
+    print("   • SecLists: https://github.com/danielmiessler/SecLists")
+    print("   • DNS wordlists: subdomains-top1million-5000.txt")
+    
+    print("\n" + "="*70)
+    print("📚 For more information:")
+    print("   • README.md - Full documentation")
+    print("   • QUICKSTART.md - Quick start guide")
+    print("   • Web UI Settings - Configure everything through the interface")
+    print("="*70 + "\n")
+
+
+def setup_amass_config(config_dir: Path, config_file: Path) -> None:
+    """Setup Amass configuration with API keys."""
+    config_dir.mkdir(parents=True, exist_ok=True)
+    
+    providers = {
+        "shodan": "Shodan API (https://account.shodan.io/)",
+        "virustotal": "VirusTotal API (https://www.virustotal.com/gui/my-apikey)",
+        "securitytrails": "SecurityTrails API (https://securitytrails.com/app/account/credentials)",
+        "censys": "Censys API (https://search.censys.io/account/api)",
+        "passivetotal": "PassiveTotal/RiskIQ API (https://community.riskiq.com/settings)",
+        "binaryedge": "BinaryEdge API (https://app.binaryedge.io/account/api)",
+        "bevigil": "BeVigil API (https://bevigil.com/osint-api)",
+    }
+    
+    api_keys = {}
+    print("\n   Press Enter to skip any provider.")
+    for name, description in providers.items():
+        print(f"\n   {description}")
+        try:
+            key = input(f"   Enter API key for {name} (or press Enter to skip): ").strip()
+            if key:
+                api_keys[name] = key
+                print(f"   ✓ {name} API key saved")
+        except (EOFError, KeyboardInterrupt):
+            break
+    
+    # Write config.ini
+    lines = [
+        "# Generated by subScraper setup wizard",
+        "# You can edit this file later to add more API keys",
+        "[resolvers]",
+        "resolver = 1.1.1.1",
+        "resolver = 8.8.8.8",
+        "",
+        "[scope]",
+        "# Add scope settings here if needed",
+        "",
+        "[datasources]",
+    ]
+    
+    for name, key in api_keys.items():
+        lines.append(f"[datasources.{name}]")
+        lines.append(f"[datasources.{name}.Credentials]")
+        lines.append(f"apikey = {key}")
+        lines.append("")
+    
+    # Add commented templates for providers not configured
+    for name in providers.keys():
+        if name not in api_keys:
+            lines.append(f"# [{name}]")
+            lines.append(f"# [datasources.{name}.Credentials]")
+            lines.append("# apikey = YOUR_KEY_HERE")
+            lines.append("")
+    
+    config_file.write_text("\n".join(lines), encoding="utf-8")
+    print(f"\n   ✓ Amass config created at: {config_file}")
+    if api_keys:
+        print(f"   ✓ Configured {len(api_keys)} API key(s)")
+    else:
+        print("   ⏭ No API keys configured (you can add them later)")
+
+
+def setup_subfinder_config(config_dir: Path, config_file: Path) -> None:
+    """Setup Subfinder configuration with API keys."""
+    config_dir.mkdir(parents=True, exist_ok=True)
+    
+    providers = {
+        "shodan": "Shodan API",
+        "censys": "Censys API",
+        "virustotal": "VirusTotal API",
+        "binaryedge": "BinaryEdge API",
+        "securitytrails": "SecurityTrails API",
+        "passivetotal": "PassiveTotal API",
+        "github": "GitHub Personal Access Token",
+    }
+    
+    api_keys = {}
+    print("\n   Press Enter to skip any provider.")
+    for name, description in providers.items():
+        try:
+            key = input(f"   Enter {description} (or press Enter to skip): ").strip()
+            if key:
+                api_keys[name] = key
+                print(f"   ✓ {name} saved")
+        except (EOFError, KeyboardInterrupt):
+            break
+    
+    # Create YAML config
+    lines = ["# Generated by subScraper setup wizard"]
+    for name, key in api_keys.items():
+        lines.append(f"{name}: [{key}]")
+    
+    if not api_keys:
+        lines.append("# Add your API keys here")
+        lines.append("# Format: provider: [api_key]")
+        lines.append("# Example:")
+        lines.append("# shodan: [your_api_key_here]")
+    
+    config_file.write_text("\n".join(lines), encoding="utf-8")
+    print(f"\n   ✓ Subfinder config created at: {config_file}")
+    if api_keys:
+        print(f"   ✓ Configured {len(api_keys)} API key(s)")
+    else:
+        print("   ⏭ No API keys configured (you can add them later)")
+
+
 # ================== AMASS CONFIG ==================
 
 def ensure_amass_config_interactive() -> None:
     """
     If no amass config is found, optionally ask user if they want a basic template
     and (optionally) enter some keys.
+    NOTE: This is only called during pipeline execution if setup was not completed.
+    The main setup wizard handles this during first run.
     """
+    # Check if setup was completed - if so, don't block with interactive prompts
+    cfg = get_config()
+    if cfg.get("setup_completed", False):
+        # Setup was completed, don't prompt during execution
+        config_dir = Path.home() / ".config" / "amass"
+        config_file = config_dir / "config.ini"
+        if not config_file.exists():
+            log("Amass config not found, but setup was completed. Skipping interactive prompt.")
+            log("You can configure Amass API keys later through the web UI or by editing ~/.config/amass/config.ini")
+        return
+    
     config_dir = Path.home() / ".config" / "amass"
     config_file = config_dir / "config.ini"
 
@@ -9542,10 +9848,41 @@ def main():
         default=8342,
         help="Port for the web UI (default: 8342)."
     )
+    parser.add_argument(
+        "--skip-setup",
+        action="store_true",
+        help="Skip the first-run setup wizard (not recommended for first run)."
+    )
 
     args = parser.parse_args()
 
     ensure_dirs()
+    
+    # Check if this is the first run and run setup wizard
+    cfg = get_config()
+    setup_completed = cfg.get("setup_completed", False)
+    
+    if not setup_completed and not args.skip_setup:
+        # Only run setup wizard in interactive mode
+        if sys.stdin.isatty():
+            try:
+                run_setup_wizard()
+                # Reload config after setup
+                cfg = get_config()
+            except KeyboardInterrupt:
+                print("\n\nSetup interrupted by user.")
+                print("You can run the setup wizard again next time,")
+                print("or configure settings through the web UI.")
+                print("\nContinuing with default settings...\n")
+                # Mark setup as completed so we don't prompt again
+                cfg["setup_completed"] = True
+                save_config(cfg)
+        else:
+            log("First run detected but running in non-interactive mode.")
+            log("Skipping setup wizard. You can configure settings through the web UI.")
+            cfg["setup_completed"] = True
+            save_config(cfg)
+    
     ensure_required_tools()
 
     if args.domain:
