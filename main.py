@@ -7374,6 +7374,7 @@ function renderReports(targets) {
     const severityFlag = `<span class="severity-flag ${escapeHtml(severity)}">Max: ${escapeHtml(severityText)}</span>`;
     
     // Add completion timestamp if available
+    // Only show timestamp for completed (non-pending) reports with a completion time
     let completedAtText = '';
     if (info && info.completed_at && !info.pending) {
       const completedDate = new Date(info.completed_at);
@@ -9470,16 +9471,20 @@ def build_state_payload() -> Dict[str, Any]:
     completed_jobs = load_completed_jobs()
     completed_targets = {}
     for job_key, job_data in completed_jobs.items():
-        # Extract domain from job key (format: domain_timestamp)
+        # Extract domain from job key
+        # Job keys are stored as "domain_timestamp" format (see add_completed_job function)
+        # Example: "example.com_1702901234.567890"
         domain = job_key.rsplit("_", 1)[0] if "_" in job_key else job_key
         
-        # Use the state data if it exists, otherwise use job data
+        # Check if this domain exists in active targets
         if domain in targets:
-            # Mark as completed (not pending)
-            targets[domain]["pending"] = False
-            targets[domain]["completed_at"] = job_data.get("completed_at")
+            # Domain is still active in state.json, add completion metadata
+            # Preserve all active data but mark as completed and add timestamp
+            if not targets[domain].get("completed_at"):
+                targets[domain]["completed_at"] = job_data.get("completed_at")
+            # Keep pending status from active calculation above
         else:
-            # Create a target entry from completed job data
+            # Domain not in active targets, create from completed job data
             completed_targets[domain] = {
                 "subdomains": job_data.get("state", {}).get("subdomains", {}),
                 "flags": job_data.get("state", {}).get("flags", {}),
@@ -9489,7 +9494,8 @@ def build_state_payload() -> Dict[str, Any]:
                 "from_completed_jobs": True,
             }
     
-    # Merge completed targets with active targets
+    # Merge: completed targets first, then active targets (active takes precedence)
+    # This ensures active scans override completed data for same domain
     all_targets = {**completed_targets, **targets}
     
     tool_info = {name: shutil.which(cmd) or "" for name, cmd in TOOLS.items()}
