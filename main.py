@@ -6027,12 +6027,12 @@ function linkifyLogText(text) {
   const escaped = escapeHtml(text || '');
   
   // Pattern to match result file names (nikto_*.json, nuclei_*.json, nmap_*.json, etc.)
-  const filePattern = /(nikto_[a-zA-Z0-9._-]+\.json|nuclei_[a-zA-Z0-9._-]+\.json|nmap_[a-zA-Z0-9._-]+\.json|httpx_[a-zA-Z0-9._-]+\.json)/g;
+  const filePattern = /(nikto_[a-zA-Z0-9._-]+\.json|nuclei_[a-zA-Z0-9._-]+\.json|nmap_[a-zA-Z0-9._-]+\.json|httpx_[a-zA-Z0-9._-]+\.json|ffuf_[a-zA-Z0-9._-]+\.json)/g;
   
   // Replace file references with download links
   return escaped.replace(filePattern, (match) => {
-    // Create a download link for the JSON file
-    return `<a href="/api/export/state" download="${match}" class="log-file-link" title="Download ${match}">${match}</a>`;
+    // Create a download link for the JSON file using the /results/ endpoint
+    return `<a href="/results/${match}" download="${match}" class="log-file-link" title="Download ${match}">${match}</a>`;
   });
 }
 
@@ -9807,6 +9807,46 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             data = requested.read_bytes()
             self._send_bytes(data, status=HTTPStatus.OK, content_type=mime or "application/octet-stream")
             return
+        
+        # Serve scan result files (nikto, nuclei, nmap, httpx JSON files)
+        if self.path.startswith("/results/"):
+            rel_path = unquote(self.path[len("/results/"):]).lstrip("/")
+            if not rel_path:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
+                return
+            
+            # Security: only allow JSON files with specific prefixes
+            allowed_prefixes = ["nikto_", "nuclei_", "nmap_", "httpx_", "ffuf_"]
+            if not any(rel_path.startswith(prefix) and rel_path.endswith(".json") for prefix in allowed_prefixes):
+                self.send_error(HTTPStatus.FORBIDDEN, "Forbidden")
+                return
+            
+            requested = (DATA_DIR / rel_path).resolve()
+            base = DATA_DIR.resolve()
+            try:
+                # Prevent path traversal
+                if not str(requested).startswith(str(base)):
+                    raise ValueError("Outside data dir")
+                # Prevent symlink attacks
+                if requested.is_symlink():
+                    raise ValueError("Symlinks not allowed")
+            except Exception:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
+                return
+            
+            if not requested.exists() or not requested.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
+                return
+            
+            data = requested.read_bytes()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f'attachment; filename="{rel_path}"')
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        
         if self.path.startswith("/api/history/commands"):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
