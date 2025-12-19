@@ -1,0 +1,590 @@
+#!/usr/bin/env python3
+"""
+Unit and Integration Tests for SubScraper
+
+Tests cover:
+1. Job scheduling and slot management
+2. Filter logic for reports
+3. API endpoints
+4. Thread safety and race conditions
+"""
+
+import copy
+import json
+import os
+import pytest
+import sqlite3
+import tempfile
+import threading
+import time
+from collections import deque
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import Mock, patch, MagicMock
+
+# Import functions from main.py
+# We'll need to structure this carefully to avoid running the main script
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Mock global state before importing
+with patch('main.ensure_dirs'), \
+     patch('main.init_database'), \
+     patch('main.migrate_json_to_sqlite'):
+    import main
+
+
+class TestJobScheduling:
+    """Tests for job scheduling and slot management"""
+    
+    def setup_method(self):
+        """Setup test fixtures"""
+        # Save original state
+        self.original_running_jobs = main.RUNNING_JOBS.copy()
+        self.original_queue = deque(main.JOB_QUEUE)
+        self.original_max_jobs = main.MAX_RUNNING_JOBS
+        
+        # Clear state for tests
+        main.RUNNING_JOBS.clear()
+        main.JOB_QUEUE.clear()
+        main.MAX_RUNNING_JOBS = 2
+    
+    def teardown_method(self):
+        """Restore original state"""
+        main.RUNNING_JOBS = self.original_running_jobs
+        main.JOB_QUEUE = self.original_queue
+        main.MAX_RUNNING_JOBS = self.original_max_jobs
+    
+    def test_count_active_jobs_locked_empty(self):
+        """Test counting active jobs when none are running"""
+        with main.JOB_LOCK:
+            count = main.count_active_jobs_locked()
+        assert count == 0
+    
+    def test_count_active_jobs_locked_with_jobs(self):
+        """Test counting active jobs with running threads"""
+        # Create mock threads
+        mock_thread1 = Mock()
+        mock_thread1.is_alive.return_value = True
+        mock_thread2 = Mock()
+        mock_thread2.is_alive.return_value = True
+        mock_thread3 = Mock()
+        mock_thread3.is_alive.return_value = False  # Dead thread
+        
+        with main.JOB_LOCK:
+            main.RUNNING_JOBS['domain1.com'] = {'thread': mock_thread1}
+            main.RUNNING_JOBS['domain2.com'] = {'thread': mock_thread2}
+            main.RUNNING_JOBS['domain3.com'] = {'thread': mock_thread3}
+            count = main.count_active_jobs_locked()
+        
+        assert count == 2  # Only alive threads count
+    
+    def test_count_active_jobs_locked_no_thread(self):
+        """Test counting when jobs exist but have no thread"""
+        with main.JOB_LOCK:
+            main.RUNNING_JOBS['domain1.com'] = {'status': 'queued'}
+            count = main.count_active_jobs_locked()
+        
+        assert count == 0
+    
+    def test_schedule_jobs_respects_max_limit(self):
+        """Test that schedule_jobs respects MAX_RUNNING_JOBS limit"""
+        main.MAX_RUNNING_JOBS = 1
+        
+        # Add jobs to queue
+        with main.JOB_LOCK:
+            main.RUNNING_JOBS['domain1.com'] = {
+                'domain': 'domain1.com',
+                'thread': None,
+                'status': 'queued',
+                'wordlist': None,
+                'skip_nikto': False,
+                'interval': 30
+            }
+            main.RUNNING_JOBS['domain2.com'] = {
+                'domain': 'domain2.com',
+                'thread': None,
+                'status': 'queued',
+                'wordlist': None,
+                'skip_nikto': False,
+                'interval': 30
+            }
+            main.JOB_QUEUE.append('domain1.com')
+            main.JOB_QUEUE.append('domain2.com')
+        
+        # Mock _start_job_thread to avoid actually starting threads
+        started_jobs = []
+        
+        def mock_start(job):
+            mock_thread = Mock()
+            mock_thread.is_alive.return_value = True
+            with main.JOB_LOCK:
+                job['thread'] = mock_thread
+            started_jobs.append(job['domain'])
+        
+        with patch('main._start_job_thread', side_effect=mock_start):
+            main.schedule_jobs()
+        
+        # Should only start 1 job due to MAX_RUNNING_JOBS = 1
+        assert len(started_jobs) == 1
+        assert started_jobs[0] == 'domain1.com'
+        
+        with main.JOB_LOCK:
+            assert len(main.JOB_QUEUE) == 1  # Second job still queued
+            assert main.JOB_QUEUE[0] == 'domain2.com'
+    
+    def test_schedule_jobs_starts_multiple_if_slots_available(self):
+        """Test that schedule_jobs can start multiple jobs if slots available"""
+        main.MAX_RUNNING_JOBS = 3
+        
+        # Add jobs to queue
+        with main.JOB_LOCK:
+            for i in range(3):
+                domain = f'domain{i}.com'
+                main.RUNNING_JOBS[domain] = {
+                    'domain': domain,
+                    'thread': None,
+                    'status': 'queued',
+                    'wordlist': None,
+                    'skip_nikto': False,
+                    'interval': 30
+                }
+                main.JOB_QUEUE.append(domain)
+        
+        started_jobs = []
+        
+        def mock_start(job):
+            mock_thread = Mock()
+            mock_thread.is_alive.return_value = True
+            with main.JOB_LOCK:
+                job['thread'] = mock_thread
+            started_jobs.append(job['domain'])
+        
+        with patch('main._start_job_thread', side_effect=mock_start):
+            main.schedule_jobs()
+        
+        # Should start all 3 jobs
+        assert len(started_jobs) == 3
+        assert set(started_jobs) == {'domain0.com', 'domain1.com', 'domain2.com'}
+        
+        with main.JOB_LOCK:
+            assert len(main.JOB_QUEUE) == 0
+    
+    def test_schedule_jobs_thread_safety(self):
+        """Test that schedule_jobs is thread-safe under concurrent access"""
+        main.MAX_RUNNING_JOBS = 2
+        
+        # Add many jobs to queue
+        with main.JOB_LOCK:
+            for i in range(10):
+                domain = f'domain{i}.com'
+                main.RUNNING_JOBS[domain] = {
+                    'domain': domain,
+                    'thread': None,
+                    'status': 'queued',
+                    'wordlist': None,
+                    'skip_nikto': False,
+                    'interval': 30
+                }
+                main.JOB_QUEUE.append(domain)
+        
+        started_jobs = []
+        start_lock = threading.Lock()
+        
+        def mock_start(job):
+            # Simulate some work
+            time.sleep(0.01)
+            mock_thread = Mock()
+            mock_thread.is_alive.return_value = True
+            with main.JOB_LOCK:
+                job['thread'] = mock_thread
+            with start_lock:
+                started_jobs.append(job['domain'])
+        
+        with patch('main._start_job_thread', side_effect=mock_start):
+            # Call schedule_jobs from multiple threads
+            threads = []
+            for _ in range(5):
+                t = threading.Thread(target=main.schedule_jobs)
+                threads.append(t)
+                t.start()
+            
+            for t in threads:
+                t.join()
+        
+        # Should respect MAX_RUNNING_JOBS limit even with concurrent calls
+        with main.JOB_LOCK:
+            active_count = sum(1 for job in main.RUNNING_JOBS.values()
+                             if job.get('thread') and job['thread'].is_alive())
+        
+        # With MAX_RUNNING_JOBS=2, should have exactly 2 active jobs
+        assert active_count == 2
+        assert len(started_jobs) == 2
+        assert len(set(started_jobs)) == 2  # No duplicates
+
+
+class TestFilterLogic:
+    """Tests for report filtering logic"""
+    
+    def test_severity_comparison(self):
+        """Test severity level comparison"""
+        severity_levels = ['NONE', 'INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+        
+        # Test that higher severities come after lower ones
+        for i, level in enumerate(severity_levels):
+            assert severity_levels.index(level) == i
+        
+        # Test filtering logic
+        filter_severity = 'MEDIUM'
+        filter_index = severity_levels.index(filter_severity)
+        
+        # These should pass the filter (>= MEDIUM)
+        assert severity_levels.index('MEDIUM') >= filter_index
+        assert severity_levels.index('HIGH') >= filter_index
+        assert severity_levels.index('CRITICAL') >= filter_index
+        
+        # These should not pass the filter (< MEDIUM)
+        assert severity_levels.index('LOW') < filter_index
+        assert severity_levels.index('INFO') < filter_index
+        assert severity_levels.index('NONE') < filter_index
+    
+    def test_domain_search_filter(self):
+        """Test domain search filtering"""
+        test_cases = [
+            ('example.com', 'example', True),
+            ('example.com', 'EXAMPLE', True),  # Case insensitive
+            ('subdomain.example.com', 'example', True),
+            ('example.com', 'test', False),
+            ('test.com', 'example', False),
+        ]
+        
+        for domain, search, should_match in test_cases:
+            result = search.lower() in domain.lower()
+            assert result == should_match, f"Failed for domain={domain}, search={search}"
+
+
+class TestAPIEndpoints:
+    """Integration tests for API endpoints"""
+    
+    def setup_method(self):
+        """Setup test fixtures"""
+        # Create temporary data directory
+        self.temp_dir = tempfile.mkdtemp()
+        self.original_data_dir = main.DATA_DIR
+        main.DATA_DIR = Path(self.temp_dir)
+        main.DB_FILE = main.DATA_DIR / "test_recon.db"
+        
+        # Initialize test database
+        main.ensure_dirs()
+        main.init_database()
+    
+    def teardown_method(self):
+        """Cleanup test fixtures"""
+        # Restore original data dir
+        main.DATA_DIR = self.original_data_dir
+        main.DB_FILE = main.DATA_DIR / "recon.db"
+        
+        # Clean up temp directory
+        import shutil
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+    
+    def test_build_state_payload_structure(self):
+        """Test that build_state_payload returns correct structure"""
+        with patch('main.load_state', return_value={'targets': {}, 'last_updated': '2024-01-01'}):
+            with patch('main.get_config', return_value={}):
+                with patch('main.snapshot_running_jobs', return_value=[]):
+                    with patch('main.job_queue_snapshot', return_value=[]):
+                        with patch('main.snapshot_workers', return_value={}):
+                            with patch('main.list_monitors', return_value=[]):
+                                with patch('main.load_completed_jobs', return_value={}):
+                                    payload = main.build_state_payload()
+        
+        # Check required keys
+        assert 'last_updated' in payload
+        assert 'targets' in payload
+        assert 'running_jobs' in payload
+        assert 'queued_jobs' in payload
+        assert 'config' in payload
+        assert 'tools' in payload
+        assert 'workers' in payload
+        assert 'monitors' in payload
+    
+    def test_build_state_payload_includes_completed_jobs(self):
+        """Test that completed jobs are merged into targets"""
+        test_state = {
+            'targets': {
+                'active.com': {
+                    'subdomains': {'sub1.active.com': {}},
+                    'flags': {},
+                    'options': {}
+                }
+            },
+            'last_updated': '2024-01-01'
+        }
+        
+        test_completed_jobs = {
+            'completed.com_123456': {
+                'state': {
+                    'subdomains': {'sub1.completed.com': {}},
+                    'flags': {},
+                },
+                'options': {},
+                'completed_at': '2024-01-01T12:00:00Z'
+            }
+        }
+        
+        with patch('main.load_state', return_value=test_state):
+            with patch('main.get_config', return_value={}):
+                with patch('main.snapshot_running_jobs', return_value=[]):
+                    with patch('main.job_queue_snapshot', return_value=[]):
+                        with patch('main.snapshot_workers', return_value={}):
+                            with patch('main.list_monitors', return_value=[]):
+                                with patch('main.load_completed_jobs', return_value=test_completed_jobs):
+                                    payload = main.build_state_payload()
+        
+        # Should have both active and completed domains
+        assert 'active.com' in payload['targets']
+        assert 'completed.com' in payload['targets']
+        assert payload['targets']['completed.com']['from_completed_jobs'] == True
+        assert payload['targets']['active.com'].get('from_completed_jobs') != True
+
+
+class TestDatabaseOperations:
+    """Tests for SQLite database operations"""
+    
+    def setup_method(self):
+        """Setup test database"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = Path(self.temp_dir) / "test.db"
+        self.conn = sqlite3.connect(str(self.db_path), isolation_level=None)
+        self.conn.row_factory = sqlite3.Row
+        
+        # Create tables
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS targets (
+                domain TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                flags TEXT,
+                options TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subdomains (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                domain TEXT NOT NULL,
+                subdomain TEXT NOT NULL,
+                data TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(domain, subdomain),
+                FOREIGN KEY (domain) REFERENCES targets(domain) ON DELETE CASCADE
+            )
+        """)
+        self.conn.commit()
+    
+    def teardown_method(self):
+        """Cleanup test database"""
+        self.conn.close()
+        import shutil
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+    
+    def test_insert_target(self):
+        """Test inserting a target into database"""
+        cursor = self.conn.cursor()
+        now = datetime.now(timezone.utc).isoformat()
+        
+        cursor.execute(
+            """INSERT INTO targets 
+               (domain, data, flags, options, created_at, updated_at) 
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            ('example.com', '{}', '{}', '{}', now, now)
+        )
+        self.conn.commit()
+        
+        cursor.execute("SELECT * FROM targets WHERE domain = ?", ('example.com',))
+        row = cursor.fetchone()
+        
+        assert row is not None
+        assert row['domain'] == 'example.com'
+    
+    def test_insert_subdomain(self):
+        """Test inserting subdomains into database"""
+        cursor = self.conn.cursor()
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # First insert target
+        cursor.execute(
+            """INSERT INTO targets 
+               (domain, data, flags, options, created_at, updated_at) 
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            ('example.com', '{}', '{}', '{}', now, now)
+        )
+        
+        # Then insert subdomain
+        sub_data = json.dumps({'sources': ['amass'], 'httpx': {}})
+        cursor.execute(
+            """INSERT INTO subdomains 
+               (domain, subdomain, data, created_at, updated_at) 
+               VALUES (?, ?, ?, ?, ?)""",
+            ('example.com', 'sub1.example.com', sub_data, now, now)
+        )
+        self.conn.commit()
+        
+        cursor.execute("SELECT * FROM subdomains WHERE domain = ?", ('example.com',))
+        row = cursor.fetchone()
+        
+        assert row is not None
+        assert row['subdomain'] == 'sub1.example.com'
+        
+        data = json.loads(row['data'])
+        assert 'sources' in data
+        assert 'amass' in data['sources']
+    
+    def test_cascade_delete(self):
+        """Test that deleting a target deletes its subdomains"""
+        cursor = self.conn.cursor()
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Insert target and subdomain
+        cursor.execute(
+            """INSERT INTO targets 
+               (domain, data, flags, options, created_at, updated_at) 
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            ('example.com', '{}', '{}', '{}', now, now)
+        )
+        cursor.execute(
+            """INSERT INTO subdomains 
+               (domain, subdomain, data, created_at, updated_at) 
+               VALUES (?, ?, ?, ?, ?)""",
+            ('example.com', 'sub1.example.com', '{}', now, now)
+        )
+        self.conn.commit()
+        
+        # Delete target
+        cursor.execute("DELETE FROM targets WHERE domain = ?", ('example.com',))
+        self.conn.commit()
+        
+        # Check subdomain is also deleted
+        cursor.execute("SELECT * FROM subdomains WHERE domain = ?", ('example.com',))
+        row = cursor.fetchone()
+        
+        assert row is None
+
+
+class TestThreadSafety:
+    """Tests for thread safety and race conditions"""
+    
+    def test_job_lock_prevents_race_conditions(self):
+        """Test that JOB_LOCK prevents concurrent modifications"""
+        main.RUNNING_JOBS.clear()
+        counter = {'value': 0}
+        errors = []
+        
+        def increment_with_lock():
+            try:
+                for _ in range(100):
+                    with main.JOB_LOCK:
+                        # Simulate some work
+                        temp = counter['value']
+                        time.sleep(0.0001)  # Small delay to encourage race conditions
+                        counter['value'] = temp + 1
+            except Exception as e:
+                errors.append(e)
+        
+        # Run from multiple threads
+        threads = []
+        for _ in range(10):
+            t = threading.Thread(target=increment_with_lock)
+            threads.append(t)
+            t.start()
+        
+        for t in threads:
+            t.join()
+        
+        # Should be exactly 1000 (10 threads * 100 increments each)
+        assert counter['value'] == 1000
+        assert len(errors) == 0
+    
+    def test_tool_gate_limits_concurrent_access(self):
+        """Test that ToolGate limits concurrent access"""
+        gate = main.ToolGate(2)  # Allow max 2 concurrent
+        active_count = {'value': 0, 'max_seen': 0}
+        lock = threading.Lock()
+        
+        def worker():
+            with gate:
+                with lock:
+                    active_count['value'] += 1
+                    if active_count['value'] > active_count['max_seen']:
+                        active_count['max_seen'] = active_count['value']
+                
+                time.sleep(0.01)  # Simulate work
+                
+                with lock:
+                    active_count['value'] -= 1
+        
+        # Run many workers
+        threads = []
+        for _ in range(20):
+            t = threading.Thread(target=worker)
+            threads.append(t)
+            t.start()
+        
+        for t in threads:
+            t.join()
+        
+        # Max concurrent should never exceed gate limit
+        assert active_count['max_seen'] <= 2
+        assert active_count['value'] == 0  # All workers finished
+
+
+class TestUtilityFunctions:
+    """Tests for utility functions"""
+    
+    def test_is_subdomain_input(self):
+        """Test subdomain detection"""
+        assert main.is_subdomain_input('sub.example.com') == True
+        assert main.is_subdomain_input('deep.sub.example.com') == True
+        assert main.is_subdomain_input('example.com') == False
+        assert main.is_subdomain_input('com') == False
+        assert main.is_subdomain_input('') == False
+    
+    def test_sanitize_domain_input(self):
+        """Test domain input sanitization"""
+        assert main._sanitize_domain_input('EXAMPLE.COM') == 'example.com'
+        assert main._sanitize_domain_input('  example.com  ') == 'example.com'
+        assert main._sanitize_domain_input('example.com\n') == 'example.com'
+    
+    def test_is_rate_limit_error(self):
+        """Test rate limit error detection"""
+        from urllib.error import HTTPError
+        
+        # Test HTTP 429
+        error_429 = HTTPError('http://test.com', 429, 'Too Many Requests', {}, None)
+        assert main.is_rate_limit_error(error_429) == True
+        
+        # Test HTTP 503
+        error_503 = HTTPError('http://test.com', 503, 'Service Unavailable', {}, None)
+        assert main.is_rate_limit_error(error_503) == True
+        
+        # Test timeout message
+        error_timeout = Exception('Connection timed out')
+        assert main.is_rate_limit_error(error_timeout) == True
+        
+        # Test rate limit keyword
+        error_rate = Exception('rate limit exceeded')
+        assert main.is_rate_limit_error(error_rate) == True
+        
+        # Test normal error
+        error_normal = Exception('Some other error')
+        assert main.is_rate_limit_error(error_normal) == False
+
+
+if __name__ == '__main__':
+    # Run tests with pytest
+    pytest.main([__file__, '-v', '--tb=short'])
