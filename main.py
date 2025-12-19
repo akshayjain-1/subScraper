@@ -119,33 +119,119 @@ TEMPLATE_AWARE_TOOLS = [
 
 
 class ToolGate:
+    """
+    Concurrency gate for tools with backlog queue support.
+    
+    When the tool is at capacity, work items are queued and processed
+    when capacity becomes available. This prevents jobs from blocking
+    indefinitely and allows them to proceed with other tools.
+    """
     def __init__(self, limit: int):
         self._limit = max(1, int(limit))
         self._count = 0
         self._cond = threading.Condition()
-
+        self._queue: deque = deque()  # Backlog queue for pending work
+        self._worker_thread: Optional[threading.Thread] = None
+        self._stop_worker = False
+        self._start_worker()
+    
+    def _start_worker(self) -> None:
+        """Start background worker thread to process queued work."""
+        if self._worker_thread is None or not self._worker_thread.is_alive():
+            self._stop_worker = False
+            self._worker_thread = threading.Thread(
+                target=self._worker_loop,
+                name=f"ToolGate-Worker",
+                daemon=True
+            )
+            self._worker_thread.start()
+    
+    def _worker_loop(self) -> None:
+        """Background worker that processes queued work items."""
+        while not self._stop_worker:
+            work_item = None
+            with self._cond:
+                # Wait for work or until stopped
+                while not self._queue and not self._stop_worker:
+                    self._cond.wait(timeout=1.0)
+                
+                if self._stop_worker:
+                    break
+                
+                # Wait for available capacity
+                while self._count >= self._limit and not self._stop_worker:
+                    self._cond.wait(timeout=1.0)
+                
+                if self._stop_worker:
+                    break
+                
+                # Get work from queue if available
+                if self._queue:
+                    work_item = self._queue.popleft()
+                    self._count += 1
+            
+            # Execute work outside the lock
+            if work_item:
+                try:
+                    func, result_callback, error_callback = work_item
+                    result = func()
+                    if result_callback:
+                        result_callback(result)
+                except Exception as exc:
+                    if error_callback:
+                        error_callback(exc)
+                finally:
+                    with self._cond:
+                        if self._count > 0:
+                            self._count -= 1
+                        self._cond.notify_all()
+    
+    def stop_worker(self) -> None:
+        """Stop the background worker thread."""
+        with self._cond:
+            self._stop_worker = True
+            self._cond.notify_all()
+    
+    def enqueue(self, func, result_callback=None, error_callback=None) -> None:
+        """
+        Enqueue a work item to be executed when capacity is available.
+        
+        Args:
+            func: Callable to execute (no arguments)
+            result_callback: Optional callback for successful result
+            error_callback: Optional callback for exceptions
+        """
+        with self._cond:
+            self._queue.append((func, result_callback, error_callback))
+            self._cond.notify_all()
+    
     def acquire(self) -> None:
+        """Acquire a slot (blocking). For backward compatibility."""
         with self._cond:
             while self._count >= self._limit:
                 self._cond.wait()
             self._count += 1
 
     def release(self) -> None:
+        """Release a slot. For backward compatibility."""
         with self._cond:
             if self._count > 0:
                 self._count -= 1
             self._cond.notify_all()
 
     def update_limit(self, limit: int) -> None:
+        """Update the concurrency limit."""
         with self._cond:
             self._limit = max(1, int(limit))
             self._cond.notify_all()
 
     def snapshot(self) -> Dict[str, int]:
+        """Get current status snapshot."""
         with self._cond:
             return {
                 "limit": self._limit,
                 "active": self._count,
+                "queued": len(self._queue),
             }
 
     def __enter__(self):
@@ -2435,17 +2521,26 @@ def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str,
 
     concurrency_fields = {
         "max_running_jobs": "Max concurrent jobs",
+        "max_parallel_amass": "Amass parallel slots",
+        "max_parallel_subfinder": "Subfinder parallel slots",
+        "max_parallel_assetfinder": "Assetfinder parallel slots",
+        "max_parallel_findomain": "Findomain parallel slots",
+        "max_parallel_sublist3r": "Sublist3r parallel slots",
+        "max_parallel_crtsh": "Crt.sh parallel slots",
+        "max_parallel_github_subdomains": "GitHub-Subdomains parallel slots",
+        "max_parallel_dnsx": "DNSx parallel slots",
+        "max_parallel_httpx": "HTTPx parallel slots",
         "max_parallel_ffuf": "FFUF parallel slots",
+        "max_parallel_waybackurls": "Waybackurls parallel slots",
+        "max_parallel_gau": "GAU parallel slots",
+        "max_parallel_nmap": "Nmap parallel slots",
         "max_parallel_nuclei": "Nuclei parallel slots",
         "max_parallel_nikto": "Nikto parallel slots",
+        "max_parallel_gowitness": "Screenshot parallel slots",
         "subfinder_threads": "Subfinder threads",
         "assetfinder_threads": "Assetfinder threads",
         "findomain_threads": "Findomain threads",
         "amass_timeout": "Amass timeout (seconds)",
-        "max_parallel_gowitness": "Screenshot parallel slots",
-        "max_parallel_dnsx": "DNSx parallel slots",
-        "max_parallel_waybackurls": "Waybackurls parallel slots",
-        "max_parallel_gau": "GAU parallel slots",
     }
     for field, label in concurrency_fields.items():
         if field in values:
@@ -6581,8 +6676,51 @@ button:hover { background:#1d4ed8; }
                 <input id="settings-findomain-threads" type="number" name="findomain_threads" min="1" />
               </label>
               <h4>Per-Tool Parallel Slots</h4>
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">Subdomain Enumeration Tools</h5>
+              <label>Amass parallel slots
+                <input id="settings-amass" type="number" name="max_parallel_amass" min="1" />
+              </label>
+              <label>Subfinder parallel slots
+                <input id="settings-subfinder" type="number" name="max_parallel_subfinder" min="1" />
+              </label>
+              <label>Assetfinder parallel slots
+                <input id="settings-assetfinder" type="number" name="max_parallel_assetfinder" min="1" />
+              </label>
+              <label>Findomain parallel slots
+                <input id="settings-findomain" type="number" name="max_parallel_findomain" min="1" />
+              </label>
+              <label>Sublist3r parallel slots
+                <input id="settings-sublist3r" type="number" name="max_parallel_sublist3r" min="1" />
+              </label>
+              <label>Crt.sh parallel slots
+                <input id="settings-crtsh" type="number" name="max_parallel_crtsh" min="1" />
+              </label>
+              <label>GitHub-Subdomains parallel slots
+                <input id="settings-github-subdomains" type="number" name="max_parallel_github_subdomains" min="1" />
+              </label>
+              
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">DNS & HTTP Tools</h5>
+              <label>DNSx parallel slots
+                <input id="settings-dnsx" type="number" name="max_parallel_dnsx" min="1" />
+              </label>
+              <label>HTTPx parallel slots
+                <input id="settings-httpx" type="number" name="max_parallel_httpx" min="1" />
+              </label>
               <label>FFUF parallel slots
                 <input id="settings-ffuf" type="number" name="max_parallel_ffuf" min="1" />
+              </label>
+              
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">URL Discovery Tools</h5>
+              <label>Waybackurls parallel slots
+                <input id="settings-waybackurls" type="number" name="max_parallel_waybackurls" min="1" />
+              </label>
+              <label>GAU parallel slots
+                <input id="settings-gau" type="number" name="max_parallel_gau" min="1" />
+              </label>
+              
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">Scanning & Analysis Tools</h5>
+              <label>Nmap parallel slots
+                <input id="settings-nmap" type="number" name="max_parallel_nmap" min="1" />
               </label>
               <label>Nuclei parallel slots
                 <input id="settings-nuclei" type="number" name="max_parallel_nuclei" min="1" />
@@ -6592,15 +6730,6 @@ button:hover { background:#1d4ed8; }
               </label>
               <label>Screenshot parallel slots
                 <input id="settings-gowitness" type="number" name="max_parallel_gowitness" min="1" />
-              </label>
-              <label>DNSx parallel slots
-                <input id="settings-dnsx" type="number" name="max_parallel_dnsx" min="1" />
-              </label>
-              <label>Waybackurls parallel slots
-                <input id="settings-waybackurls" type="number" name="max_parallel_waybackurls" min="1" />
-              </label>
-              <label>GAU parallel slots
-                <input id="settings-gau" type="number" name="max_parallel_gau" min="1" />
               </label>
             </div>
             
@@ -6868,13 +6997,22 @@ const settingsAssetfinderThreads = document.getElementById('settings-assetfinder
 const settingsFindomainThreads = document.getElementById('settings-findomain-threads');
 const settingsGlobalRateLimit = document.getElementById('settings-global-rate-limit');
 const settingsMaxJobs = document.getElementById('settings-max-jobs');
+const settingsAmass = document.getElementById('settings-amass');
+const settingsSubfinder = document.getElementById('settings-subfinder');
+const settingsAssetfinder = document.getElementById('settings-assetfinder');
+const settingsFindomain = document.getElementById('settings-findomain');
+const settingsSublist3r = document.getElementById('settings-sublist3r');
+const settingsCrtsh = document.getElementById('settings-crtsh');
+const settingsGithubSubdomains = document.getElementById('settings-github-subdomains');
+const settingsDnsx = document.getElementById('settings-dnsx');
+const settingsHttpx = document.getElementById('settings-httpx');
 const settingsFFUF = document.getElementById('settings-ffuf');
+const settingsWaybackurls = document.getElementById('settings-waybackurls');
+const settingsGau = document.getElementById('settings-gau');
+const settingsNmap = document.getElementById('settings-nmap');
 const settingsNuclei = document.getElementById('settings-nuclei');
 const settingsNikto = document.getElementById('settings-nikto');
 const settingsGowitness = document.getElementById('settings-gowitness');
-const settingsDnsx = document.getElementById('settings-dnsx');
-const settingsWaybackurls = document.getElementById('settings-waybackurls');
-const settingsGau = document.getElementById('settings-gau');
 const settingsDynamicMode = document.getElementById('settings-dynamic-mode');
 const settingsDynamicBaseJobs = document.getElementById('settings-dynamic-base-jobs');
 const settingsDynamicMaxJobs = document.getElementById('settings-dynamic-max-jobs');
@@ -7798,6 +7936,7 @@ function renderWorkers(workers) {
     const info = tools[name] || {};
     const limit = info.limit;
     const active = info.active || 0;
+    const queued = info.queued || 0;
     
     // Handle tools with and without concurrency gates
     if (limit == null) {
@@ -7810,13 +7949,15 @@ function renderWorkers(workers) {
         </div>
       `;
     } else {
-      // Tool with gate - show active/limit
+      // Tool with gate - show active/limit and queued items
       const pct = limit ? Math.min(100, Math.round(active / limit * 100)) : 0;
+      const queueInfo = queued > 0 ? `<div class="muted" style="margin-top: 4px;">📋 ${queued} queued</div>` : '';
       return `
         <div class="worker-card">
           <h3>${escapeHtml(name)}</h3>
           <div class="metric">${active}/${limit}</div>
           <div class="muted">slots in use</div>
+          ${queueInfo}
           <div class="worker-progress">${renderProgress(pct, active >= limit ? 'running' : 'completed')}</div>
         </div>
       `;
@@ -9452,13 +9593,22 @@ function renderSettings(config, tools) {
     settingsFindomainThreads.value = config.findomain_threads || 40;
     settingsGlobalRateLimit.value = config.global_rate_limit || 0;
     settingsMaxJobs.value = config.max_running_jobs || 1;
+    settingsAmass.value = config.max_parallel_amass || 1;
+    settingsSubfinder.value = config.max_parallel_subfinder || 1;
+    settingsAssetfinder.value = config.max_parallel_assetfinder || 1;
+    settingsFindomain.value = config.max_parallel_findomain || 1;
+    settingsSublist3r.value = config.max_parallel_sublist3r || 1;
+    settingsCrtsh.value = config.max_parallel_crtsh || 1;
+    settingsGithubSubdomains.value = config.max_parallel_github_subdomains || 1;
+    settingsDnsx.value = config.max_parallel_dnsx || 1;
+    settingsHttpx.value = config.max_parallel_httpx || 1;
     settingsFFUF.value = config.max_parallel_ffuf || 1;
+    settingsWaybackurls.value = config.max_parallel_waybackurls || 1;
+    settingsGau.value = config.max_parallel_gau || 1;
+    settingsNmap.value = config.max_parallel_nmap || 1;
     settingsNuclei.value = config.max_parallel_nuclei || 1;
     settingsNikto.value = config.max_parallel_nikto || 1;
     settingsGowitness.value = config.max_parallel_gowitness || 1;
-    settingsDnsx.value = config.max_parallel_dnsx || 1;
-    settingsWaybackurls.value = config.max_parallel_waybackurls || 1;
-    settingsGau.value = config.max_parallel_gau || 1;
     settingsDynamicMode.checked = config.dynamic_mode_enabled || false;
     settingsDynamicBaseJobs.value = config.dynamic_mode_base_jobs || 1;
     settingsDynamicMaxJobs.value = config.dynamic_mode_max_jobs || 10;
@@ -9606,13 +9756,22 @@ if (settingsForm) {
         findomain_threads: settingsFindomainThreads ? settingsFindomainThreads.value : '',
         global_rate_limit: settingsGlobalRateLimit ? settingsGlobalRateLimit.value : '',
         max_running_jobs: settingsMaxJobs ? settingsMaxJobs.value : '',
+        max_parallel_amass: settingsAmass ? settingsAmass.value : '',
+        max_parallel_subfinder: settingsSubfinder ? settingsSubfinder.value : '',
+        max_parallel_assetfinder: settingsAssetfinder ? settingsAssetfinder.value : '',
+        max_parallel_findomain: settingsFindomain ? settingsFindomain.value : '',
+        max_parallel_sublist3r: settingsSublist3r ? settingsSublist3r.value : '',
+        max_parallel_crtsh: settingsCrtsh ? settingsCrtsh.value : '',
+        max_parallel_github_subdomains: settingsGithubSubdomains ? settingsGithubSubdomains.value : '',
+        max_parallel_dnsx: settingsDnsx ? settingsDnsx.value : '',
+        max_parallel_httpx: settingsHttpx ? settingsHttpx.value : '',
         max_parallel_ffuf: settingsFFUF ? settingsFFUF.value : '',
+        max_parallel_waybackurls: settingsWaybackurls ? settingsWaybackurls.value : '',
+        max_parallel_gau: settingsGau ? settingsGau.value : '',
+        max_parallel_nmap: settingsNmap ? settingsNmap.value : '',
         max_parallel_nuclei: settingsNuclei ? settingsNuclei.value : '',
         max_parallel_nikto: settingsNikto ? settingsNikto.value : '',
         max_parallel_gowitness: settingsGowitness ? settingsGowitness.value : '',
-        max_parallel_dnsx: settingsDnsx ? settingsDnsx.value : '',
-        max_parallel_waybackurls: settingsWaybackurls ? settingsWaybackurls.value : '',
-        max_parallel_gau: settingsGau ? settingsGau.value : '',
         dynamic_mode_enabled: settingsDynamicMode ? settingsDynamicMode.checked : false,
         dynamic_mode_base_jobs: settingsDynamicBaseJobs ? settingsDynamicBaseJobs.value : '',
         dynamic_mode_max_jobs: settingsDynamicMaxJobs ? settingsDynamicMaxJobs.value : '',
