@@ -135,11 +135,28 @@ class ToolGate:
             if self._count > 0:
                 self._count -= 1
             self._cond.notify_all()
+        # Notify scheduler that a tool slot is now available
+        # This allows queued jobs to start if there are free job slots
+        # Using globals() to avoid forward reference issues
+        scheduler_func = globals().get('schedule_jobs')
+        if scheduler_func and callable(scheduler_func):
+            try:
+                scheduler_func()
+            except Exception as e:
+                # Don't let scheduling errors break the release
+                log(f"Warning: Error during job scheduling after tool release: {e}")
 
     def update_limit(self, limit: int) -> None:
         with self._cond:
             self._limit = max(1, int(limit))
             self._cond.notify_all()
+        # Check if we can schedule more jobs with the new limit
+        scheduler_func = globals().get('schedule_jobs')
+        if scheduler_func and callable(scheduler_func):
+            try:
+                scheduler_func()
+            except Exception as e:
+                log(f"Warning: Error during job scheduling after limit update: {e}")
 
     def snapshot(self) -> Dict[str, int]:
         with self._cond:
