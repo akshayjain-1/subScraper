@@ -9137,10 +9137,10 @@ launchForm.addEventListener('submit', async (event) => {
 });
 
 if (settingsForm) {
-  settingsForm.addEventListener('submit', async (event) => {
+  // Create the save settings function that can be called from anywhere
+  window.saveSettingsNow = async function() {
     try {
-      console.log('Settings form submitted');
-      event.preventDefault();
+      console.log('[DEBUG] saveSettingsNow called');
       
       // Validate all required elements exist
       if (!settingsStatus) {
@@ -9225,29 +9225,42 @@ if (settingsForm) {
         alert('Error saving settings: ' + err.message);
       }
     }
+  };
+  
+  // Attach to form submit event
+  settingsForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    console.log('[DEBUG] Form submit event fired');
+    await window.saveSettingsNow();
   });
   
-  // Also add a direct button click handler as fallback
+  // Also add a direct button click handler
   if (settingsSaveBtn) {
-    settingsSaveBtn.addEventListener('click', (event) => {
-      console.log('[DEBUG] Save button clicked directly');
-      // Let the form handle it naturally, but log that we saw the click
+    settingsSaveBtn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      console.log('[DEBUG] Save button clicked directly, calling saveSettingsNow');
+      await window.saveSettingsNow();
     });
+  } else {
+    console.error('[DEBUG] settingsSaveBtn not found!');
   }
   
   // Add Enter key support for all settings inputs
   const settingsInputs = settingsForm.querySelectorAll('input, textarea, select');
+  console.log('[DEBUG] Found', settingsInputs.length, 'form inputs for Enter key binding');
   settingsInputs.forEach(input => {
-    input.addEventListener('keypress', (event) => {
+    input.addEventListener('keydown', async (event) => {
       if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') {
         event.preventDefault();
-        console.log('[DEBUG] Enter pressed in settings form input, triggering submit');
-        settingsForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        event.stopPropagation();
+        console.log('[DEBUG] Enter pressed in', event.target.id || event.target.name, ', calling saveSettingsNow');
+        await window.saveSettingsNow();
       }
     });
   });
   
-  console.log('[DEBUG] Settings form handlers attached. Form ID:', settingsForm.id);
+  console.log('[DEBUG] Settings form handlers attached. Form ID:', settingsForm.id, 'Button:', settingsSaveBtn ? 'found' : 'NOT FOUND');
 } else {
   console.error('Cannot attach submit handler: settingsForm is null');
 }
