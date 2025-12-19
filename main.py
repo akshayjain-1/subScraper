@@ -5453,6 +5453,7 @@ def _start_job_thread(job: Dict[str, Any]) -> None:
             if job_to_save:
                 add_completed_job(domain, job_to_save)
             
+            # Schedule next jobs after cleanup
             schedule_jobs()
             cleanup_job_control(domain)
 
@@ -5460,23 +5461,39 @@ def _start_job_thread(job: Dict[str, Any]) -> None:
     with JOB_LOCK:
         job["thread"] = thread
         job["started"] = datetime.now(timezone.utc).isoformat()
-    thread.start()
+        # Start thread while holding lock to prevent race condition
+        # This ensures count_active_jobs_locked() sees the thread immediately
+        thread.start()
     job_log_append(domain, "Job dispatched to worker.", "scheduler")
 
 
 def schedule_jobs() -> None:
-    to_start: List[Dict[str, Any]] = []
-    with JOB_LOCK:
-        while JOB_QUEUE and count_active_jobs_locked() < MAX_RUNNING_JOBS:
+    """
+    Schedule queued jobs to run, respecting MAX_RUNNING_JOBS limit.
+    Starts jobs one at a time while holding the lock to prevent race conditions.
+    """
+    while True:
+        job_to_start = None
+        with JOB_LOCK:
+            # Check if we can start another job
+            if not JOB_QUEUE or count_active_jobs_locked() >= MAX_RUNNING_JOBS:
+                break
+            
+            # Get next job from queue
             domain = JOB_QUEUE.popleft()
             job = RUNNING_JOBS.get(domain)
+            
+            # Skip if job doesn't exist or already has a thread
             if not job or job.get("thread"):
                 continue
+            
             job["status"] = "dispatching"
             job["message"] = "Preparing to start."
-            to_start.append(job)
-    for job in to_start:
-        _start_job_thread(job)
+            job_to_start = job
+        
+        # Start the job (this acquires JOB_LOCK internally)
+        if job_to_start:
+            _start_job_thread(job_to_start)
 
 
 # ================== WEB COMMAND CENTER ==================
@@ -7329,12 +7346,28 @@ function renderTargets(targets) {
       </div>
       <div class="table-pagination" id="${paginationId}"></div>
     ` : '<p class="muted">No subdomains collected yet.</p>';
+    
+    // Generate node map visualization
+    const nodeMapId = `node-map-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const nodeMap = keys.length > 0 ? `
+      <div style="margin: 16px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="margin: 0; font-size: 14px; color: #93c5fd;">Subdomain Network Map</h4>
+          <button class="btn small" onclick="toggleNodeMap('${nodeMapId}')">Toggle Map</button>
+        </div>
+        <div id="${nodeMapId}" style="display: none;">
+          <canvas id="${nodeMapId}-canvas" width="800" height="400" style="width: 100%; height: 400px; background: #050b18; border-radius: 12px; border: 1px solid #1f2937; cursor: pointer;"></canvas>
+        </div>
+      </div>
+    ` : '';
+    
     return `
       <div class="target-card" data-domain="${escapeHtml(domain)}">
         <div class="job-summary">
           <div>${escapeHtml(domain)}</div>
           <div>${badges}</div>
         </div>
+        ${nodeMap}
         ${table}
       </div>
     `;
@@ -7352,6 +7385,201 @@ function renderTargets(targets) {
       initPagination(table, pagerEl, DEFAULT_PAGE_SIZE);
     }
   });
+  
+  // Initialize node maps
+  entries.forEach(([domain, info]) => {
+    const nodeMapId = `node-map-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
+    initNodeMap(domain, info, nodeMapId);
+  });
+}
+
+// Node map visualization functions
+function toggleNodeMap(mapId) {
+  const mapEl = document.getElementById(mapId);
+  if (mapEl) {
+    const isVisible = mapEl.style.display !== 'none';
+    mapEl.style.display = isVisible ? 'none' : 'block';
+    if (!isVisible) {
+      // Redraw when shown
+      const canvasId = `${mapId}-canvas`;
+      const canvas = document.getElementById(canvasId);
+      if (canvas && canvas.dataset.domain) {
+        drawNodeMap(canvas);
+      }
+    }
+  }
+}
+
+function initNodeMap(domain, info, mapId) {
+  const canvasId = `${mapId}-canvas`;
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  
+  const subs = (info && info.subdomains) || {};
+  const subdomains = Object.keys(subs).sort();
+  
+  // Store data in canvas dataset
+  canvas.dataset.domain = domain;
+  canvas.dataset.subdomains = JSON.stringify(subdomains);
+  
+  // Set actual canvas resolution
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = rect.height * window.devicePixelRatio;
+  
+  // Draw the node map
+  drawNodeMap(canvas);
+  
+  // Add click handler
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    handleNodeMapClick(canvas, x, y);
+  });
+}
+
+function drawNodeMap(canvas) {
+  const ctx = canvas.getContext('2d');
+  const domain = canvas.dataset.domain;
+  const subdomains = JSON.parse(canvas.dataset.subdomains || '[]');
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, width, height);
+  
+  // Draw background
+  ctx.fillStyle = '#050b18';
+  ctx.fillRect(0, 0, width, height);
+  
+  if (subdomains.length === 0) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = `${16 * window.devicePixelRatio}px system-ui`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('No subdomains to display', width / 2, height / 2);
+    return;
+  }
+  
+  // Calculate layout
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const domainRadius = 30 * window.devicePixelRatio;
+  const subRadius = 15 * window.devicePixelRatio;
+  const orbitRadius = Math.min(width, height) * 0.35;
+  
+  // Store node positions for click detection
+  const nodes = [];
+  
+  // Draw connections from domain to subdomains
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2 * window.devicePixelRatio;
+  subdomains.forEach((sub, i) => {
+    const angle = (i / subdomains.length) * Math.PI * 2 - Math.PI / 2;
+    const x = centerX + Math.cos(angle) * orbitRadius;
+    const y = centerY + Math.sin(angle) * orbitRadius;
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  });
+  
+  // Draw subdomain nodes
+  subdomains.forEach((sub, i) => {
+    const angle = (i / subdomains.length) * Math.PI * 2 - Math.PI / 2;
+    const x = centerX + Math.cos(angle) * orbitRadius;
+    const y = centerY + Math.sin(angle) * orbitRadius;
+    
+    // Node circle
+    ctx.fillStyle = '#2563eb';
+    ctx.beginPath();
+    ctx.arc(x, y, subRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Node border
+    ctx.strokeStyle = '#60a5fa';
+    ctx.lineWidth = 2 * window.devicePixelRatio;
+    ctx.stroke();
+    
+    // Store for click detection
+    nodes.push({ x, y, radius: subRadius, subdomain: sub, type: 'subdomain' });
+    
+    // Label (only show if space allows)
+    if (subdomains.length < 20) {
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = `${11 * window.devicePixelRatio}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const labelY = y + subRadius + 15 * window.devicePixelRatio;
+      const shortLabel = sub.length > 15 ? sub.substring(0, 12) + '...' : sub;
+      ctx.fillText(shortLabel, x, labelY);
+    }
+  });
+  
+  // Draw domain node (center)
+  ctx.fillStyle = '#1d4ed8';
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, domainRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 3 * window.devicePixelRatio;
+  ctx.stroke();
+  
+  // Domain label
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${14 * window.devicePixelRatio}px system-ui`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const domainLabel = domain.length > 12 ? domain.substring(0, 10) + '...' : domain;
+  ctx.fillText(domainLabel, centerX, centerY);
+  
+  // Store domain node
+  nodes.push({ x: centerX, y: centerY, radius: domainRadius, domain: domain, type: 'domain' });
+  
+  // Store nodes in canvas dataset for click handling
+  canvas.dataset.nodes = JSON.stringify(nodes);
+  
+  // Draw legend
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = `${10 * window.devicePixelRatio}px system-ui`;
+  ctx.textAlign = 'left';
+  ctx.fillText(`${subdomains.length} subdomains`, 10 * window.devicePixelRatio, height - 10 * window.devicePixelRatio);
+}
+
+function handleNodeMapClick(canvas, x, y) {
+  const nodes = JSON.parse(canvas.dataset.nodes || '[]');
+  const domain = canvas.dataset.domain;
+  
+  // Check if click is on any node
+  for (const node of nodes) {
+    const dx = x - node.x;
+    const dy = y - node.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance <= node.radius) {
+      if (node.type === 'subdomain') {
+        // Navigate to subdomain detail page
+        window.location.href = `/subdomain/${encodeURIComponent(domain)}/${encodeURIComponent(node.subdomain)}`;
+      } else if (node.type === 'domain') {
+        // Could navigate to domain report or do nothing
+        const reportsLink = document.querySelector(`a[href="#reports"]`);
+        if (reportsLink) {
+          reportsLink.click();
+          setTimeout(() => {
+            const domainCard = document.querySelector(`.report-nav-card[data-report-domain="${domain}"]`);
+            if (domainCard) {
+              domainCard.click();
+            }
+          }, 100);
+        }
+      }
+      break;
+    }
+  }
 }
 
 function renderWorkflowDiagram() {
@@ -8074,15 +8302,131 @@ function hasActiveJob(domain) {
     latestQueuedJobs.some(job => job.domain === domain);
 }
 
+// Report filter management
+function getReportFilters() {
+  try {
+    const saved = localStorage.getItem('reportFilters');
+    return saved ? JSON.parse(saved) : {
+      domainSearch: '',
+      status: 'all',
+      maxSeverity: 'all',
+      hasFindings: false,
+      hasScreenshots: false
+    };
+  } catch (e) {
+    return {
+      domainSearch: '',
+      status: 'all',
+      maxSeverity: 'all',
+      hasFindings: false,
+      hasScreenshots: false
+    };
+  }
+}
+
+function saveReportFiltersToStorage() {
+  try {
+    const domainSearch = document.getElementById('report-domain-search')?.value || '';
+    const status = document.getElementById('report-status-filter')?.value || 'all';
+    const maxSeverity = document.getElementById('report-severity-filter')?.value || 'all';
+    const hasFindings = document.getElementById('report-has-findings')?.checked || false;
+    const hasScreenshots = document.getElementById('report-has-screenshots')?.checked || false;
+    
+    localStorage.setItem('reportFilters', JSON.stringify({
+      domainSearch,
+      status,
+      maxSeverity,
+      hasFindings,
+      hasScreenshots
+    }));
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
+function attachReportFilterListeners() {
+  const domainSearch = document.getElementById('report-domain-search');
+  const statusFilter = document.getElementById('report-status-filter');
+  const severityFilter = document.getElementById('report-severity-filter');
+  const findingsFilter = document.getElementById('report-has-findings');
+  const screenshotsFilter = document.getElementById('report-has-screenshots');
+  
+  const applyFilters = () => {
+    saveReportFiltersToStorage();
+    renderReports(latestTargetsData);
+  };
+  
+  if (domainSearch) {
+    domainSearch.addEventListener('input', applyFilters);
+  }
+  if (statusFilter) {
+    statusFilter.addEventListener('change', applyFilters);
+  }
+  if (severityFilter) {
+    severityFilter.addEventListener('change', applyFilters);
+  }
+  if (findingsFilter) {
+    findingsFilter.addEventListener('change', applyFilters);
+  }
+  if (screenshotsFilter) {
+    screenshotsFilter.addEventListener('change', applyFilters);
+  }
+}
+
 function renderReports(targets) {
   latestTargetsData = targets || {};
+  
+  // Get filter values
+  const filters = getReportFilters();
+  
   const entries = Object.entries(latestTargetsData);
   if (!entries.length) {
     reportsBody.innerHTML = '<div class="section-placeholder">No reconnaissance data yet.</div>';
     selectedReportDomain = null;
     return;
   }
-  entries.sort((a, b) => {
+  
+  // Apply filters
+  const filteredEntries = entries.filter(([domain, info]) => {
+    // Domain search filter
+    if (filters.domainSearch && !domain.toLowerCase().includes(filters.domainSearch.toLowerCase())) {
+      return false;
+    }
+    
+    // Status filter (pending/complete)
+    if (filters.status !== 'all') {
+      const isPending = info && info.pending;
+      if (filters.status === 'pending' && !isPending) return false;
+      if (filters.status === 'complete' && isPending) return false;
+    }
+    
+    // Severity filter
+    if (filters.maxSeverity !== 'all') {
+      const stats = computeReportStats(info || {});
+      const severity = stats.maxSeverity || 'NONE';
+      const severityLevels = ['NONE', 'INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+      const filterIndex = severityLevels.indexOf(filters.maxSeverity);
+      const domainIndex = severityLevels.indexOf(severity);
+      if (domainIndex < filterIndex) return false;
+    }
+    
+    // Has findings filter
+    if (filters.hasFindings) {
+      const stats = computeReportStats(info || {});
+      if (stats.nuclei === 0 && stats.nikto === 0) return false;
+    }
+    
+    // Has screenshots filter
+    if (filters.hasScreenshots) {
+      const stats = computeReportStats(info || {});
+      if (stats.screenshots === 0) return false;
+    }
+    
+    return true;
+  });
+  
+  // Sort filtered entries
+  filteredEntries.sort((a, b) => {
     const aInfo = a[1] || {};
     const bInfo = b[1] || {};
     if (!!aInfo.pending !== !!bInfo.pending) {
@@ -8093,10 +8437,12 @@ function renderReports(targets) {
     if (aSubs !== bSubs) return bSubs - aSubs;
     return a[0].localeCompare(b[0]);
   });
+  
   if (!selectedReportDomain || !latestTargetsData[selectedReportDomain]) {
-    selectedReportDomain = entries[0][0];
+    selectedReportDomain = filteredEntries.length > 0 ? filteredEntries[0][0] : null;
   }
-  const cards = entries.map(([domain, info]) => {
+  
+  const cards = filteredEntries.map(([domain, info]) => {
     const stats = computeReportStats(info || {});
     const badge = info && info.pending
       ? '<span class="report-badge pending">Pending</span>'
@@ -8130,16 +8476,66 @@ function renderReports(targets) {
       </div>
     `;
   }).join('');
+  
+  const filterControls = `
+    <div class="filter-bar" style="margin-bottom: 16px; padding: 16px; background: var(--panel-alt); border-radius: 12px; border: 1px solid #1f2937;">
+      <h3 style="margin: 0 0 12px 0; font-size: 14px; color: #93c5fd;">Filter Reports</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+        <div>
+          <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Search Domain</label>
+          <input type="search" id="report-domain-search" placeholder="example.com" value="${escapeHtml(filters.domainSearch || '')}" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0b152c; color: var(--text);">
+        </div>
+        <div>
+          <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Status</label>
+          <select id="report-status-filter" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0b152c; color: var(--text);">
+            <option value="all" ${filters.status === 'all' ? 'selected' : ''}>All</option>
+            <option value="pending" ${filters.status === 'pending' ? 'selected' : ''}>Pending</option>
+            <option value="complete" ${filters.status === 'complete' ? 'selected' : ''}>Complete</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Min Severity</label>
+          <select id="report-severity-filter" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0b152c; color: var(--text);">
+            <option value="all" ${filters.maxSeverity === 'all' ? 'selected' : ''}>All</option>
+            <option value="INFO" ${filters.maxSeverity === 'INFO' ? 'selected' : ''}>Info+</option>
+            <option value="LOW" ${filters.maxSeverity === 'LOW' ? 'selected' : ''}>Low+</option>
+            <option value="MEDIUM" ${filters.maxSeverity === 'MEDIUM' ? 'selected' : ''}>Medium+</option>
+            <option value="HIGH" ${filters.maxSeverity === 'HIGH' ? 'selected' : ''}>High+</option>
+            <option value="CRITICAL" ${filters.maxSeverity === 'CRITICAL' ? 'selected' : ''}>Critical</option>
+          </select>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; justify-content: center;">
+          <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="report-has-findings" ${filters.hasFindings ? 'checked' : ''}>
+            Has Findings
+          </label>
+          <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="report-has-screenshots" ${filters.hasScreenshots ? 'checked' : ''}>
+            Has Screenshots
+          </label>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: var(--muted);">
+        Showing ${filteredEntries.length} of ${entries.length} reports
+      </div>
+    </div>
+  `;
+  
   reportsBody.innerHTML = `
     <div class="export-actions">
       <a class="btn" href="/api/export/state" target="_blank">Download JSON</a>
       <a class="btn secondary" href="/api/export/csv" target="_blank">Download CSV</a>
     </div>
+    ${filterControls}
     <div class="reports-layout">
       <div class="reports-nav" id="reports-nav">${cards}</div>
       <div class="report-detail" id="report-detail"></div>
     </div>
   `;
+  
+  // Attach filter event listeners
+  attachReportFilterListeners();
+  
   renderReportDetail(selectedReportDomain);
 }
 
@@ -9935,7 +10331,37 @@ attachSubdomainFilters = function(detailEl) {
 console.log('[DEBUG] Script execution complete, starting event handlers and fetch');
 renderWorkflowDiagram();
 fetchState();
-setInterval(fetchState, POLL_INTERVAL);
+
+// Only auto-refresh on overview/monitoring pages, not on detail pages
+// This prevents unnecessary refreshes on static pages like settings, gallery, etc.
+const VIEWS_WITH_AUTO_REFRESH = ['overview', 'jobs', 'queue', 'workers', 'resources', 'monitors', 'logs'];
+let pollIntervalId = null;
+
+function startPolling() {
+  if (pollIntervalId) return; // Already polling
+  pollIntervalId = setInterval(() => {
+    const currentView = getCurrentView();
+    if (VIEWS_WITH_AUTO_REFRESH.includes(currentView)) {
+      fetchState();
+    }
+  }, POLL_INTERVAL);
+}
+
+function getCurrentView() {
+  const hash = location.hash ? location.hash.substring(1) : 'overview';
+  return hash || 'overview';
+}
+
+// Start polling
+startPolling();
+
+// Also fetch when view changes to ensure fresh data
+window.addEventListener('hashchange', () => {
+  const currentView = getCurrentView();
+  if (VIEWS_WITH_AUTO_REFRESH.includes(currentView)) {
+    fetchState();
+  }
+});
 </script>
 </body>
 </html>
