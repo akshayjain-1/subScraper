@@ -157,14 +157,22 @@ class ToolGate:
 
 
 TOOL_GATES: Dict[str, ToolGate] = {
-    "ffuf": ToolGate(1),
-    "nuclei": ToolGate(1),
-    "nikto": ToolGate(1),
-    "gowitness": ToolGate(1),
-    "nmap": ToolGate(1),
+    "amass": ToolGate(1),
+    "subfinder": ToolGate(1),
+    "assetfinder": ToolGate(1),
+    "findomain": ToolGate(1),
+    "sublist3r": ToolGate(1),
+    "crtsh": ToolGate(1),
+    "github-subdomains": ToolGate(1),
     "dnsx": ToolGate(1),
+    "ffuf": ToolGate(1),
+    "httpx": ToolGate(1),
     "waybackurls": ToolGate(1),
     "gau": ToolGate(1),
+    "gowitness": ToolGate(1),
+    "nmap": ToolGate(1),
+    "nuclei": ToolGate(1),
+    "nikto": ToolGate(1),
 }
 JOB_QUEUE: deque = deque()
 MAX_RUNNING_JOBS = 1
@@ -942,14 +950,22 @@ def apply_concurrency_limits(cfg: Dict[str, Any]) -> None:
         GLOBAL_RATE_LIMIT_DELAY = 0.0
     
     parallel_fields = {
-        "ffuf": "max_parallel_ffuf",
-        "nuclei": "max_parallel_nuclei",
-        "nikto": "max_parallel_nikto",
-        "gowitness": "max_parallel_gowitness",
-        "nmap": "max_parallel_nmap",
+        "amass": "max_parallel_amass",
+        "subfinder": "max_parallel_subfinder",
+        "assetfinder": "max_parallel_assetfinder",
+        "findomain": "max_parallel_findomain",
+        "sublist3r": "max_parallel_sublist3r",
+        "crtsh": "max_parallel_crtsh",
+        "github-subdomains": "max_parallel_github_subdomains",
         "dnsx": "max_parallel_dnsx",
+        "ffuf": "max_parallel_ffuf",
+        "httpx": "max_parallel_httpx",
         "waybackurls": "max_parallel_waybackurls",
         "gau": "max_parallel_gau",
+        "gowitness": "max_parallel_gowitness",
+        "nmap": "max_parallel_nmap",
+        "nuclei": "max_parallel_nuclei",
+        "nikto": "max_parallel_nikto",
     }
     for tool, field in parallel_fields.items():
         gate = TOOL_GATES.setdefault(tool, ToolGate(1))
@@ -1028,14 +1044,22 @@ def default_config() -> Dict[str, Any]:
         "subfinder_threads": 32,
         "assetfinder_threads": 10,
         "findomain_threads": 40,
-        "max_parallel_ffuf": 1,
-        "max_parallel_nuclei": 1,
-        "max_parallel_nikto": 1,
-        "max_parallel_gowitness": 1,
-        "max_parallel_nmap": 1,
+        "max_parallel_amass": 1,
+        "max_parallel_subfinder": 1,
+        "max_parallel_assetfinder": 1,
+        "max_parallel_findomain": 1,
+        "max_parallel_sublist3r": 1,
+        "max_parallel_crtsh": 1,
+        "max_parallel_github_subdomains": 1,
         "max_parallel_dnsx": 1,
+        "max_parallel_ffuf": 1,
+        "max_parallel_httpx": 1,
         "max_parallel_waybackurls": 1,
         "max_parallel_gau": 1,
+        "max_parallel_gowitness": 1,
+        "max_parallel_nmap": 1,
+        "max_parallel_nuclei": 1,
+        "max_parallel_nikto": 1,
         "enable_nmap": True,
         "nmap_timeout": 300,
         "max_nmap_output_size": 5000,
@@ -4117,7 +4141,12 @@ def run_downstream_pipeline(
             continue
         update_step("httpx", status="running", message=f"httpx scanning {len(new_hosts)} pending hosts", progress=40)
         batch_file = write_subdomains_file(domain, new_hosts, suffix="_httpx_batch")
-        httpx_json = httpx_scan(batch_file, domain, config=config, job_domain=job_domain)
+        if job_domain:
+            job_log_append(job_domain, "Waiting for httpx slot...", "scheduler")
+        with TOOL_GATES["httpx"]:
+            if job_domain:
+                job_log_append(job_domain, "httpx slot acquired.", "scheduler")
+            httpx_json = httpx_scan(batch_file, domain, config=config, job_domain=job_domain)
         try:
             batch_file.unlink()
         except FileNotFoundError:
@@ -5360,7 +5389,14 @@ def run_pipeline(
 
             def enum_worker(name: str, func) -> None:
                 try:
-                    subs = func() or []
+                    # Wait for tool slot if gate exists
+                    if name in TOOL_GATES:
+                        job_log_append(job_domain, f"Waiting for {name} slot...", "scheduler")
+                        with TOOL_GATES[name]:
+                            job_log_append(job_domain, f"{name} slot acquired.", "scheduler")
+                            subs = func() or []
+                    else:
+                        subs = func() or []
                     with lock:
                         enum_results[name] = subs
                 except Exception as exc:
