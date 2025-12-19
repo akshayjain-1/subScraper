@@ -2120,24 +2120,33 @@ def save_config(cfg: Dict[str, Any]) -> None:
         cursor = db.cursor()
         now = datetime.now(timezone.utc).isoformat()
         
-        # Use a transaction to ensure all-or-nothing save
-        cursor.execute("BEGIN IMMEDIATE")
+        # Temporarily set isolation_level to enable proper transaction handling
+        # Note: Connection is normally in autocommit mode (isolation_level=None)
+        # We need to switch to a transaction mode for atomic save
+        old_isolation = db.isolation_level
         try:
-            for key, value in cfg.items():
-                cursor.execute(
-                    "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
-                    (key, json.dumps(value), now)
-                )
+            # Switch to deferred transaction mode
+            db.isolation_level = "DEFERRED"
             
-            db.commit()
-        except sqlite3.Error as e:
-            db.rollback()
-            log(f"Database error saving config: {e}")
-            raise
-        except Exception as e:
-            db.rollback()
-            log(f"Unexpected error saving config to database: {e}")
-            raise
+            # Now start an explicit transaction with IMMEDIATE lock
+            cursor.execute("BEGIN IMMEDIATE")
+            try:
+                for key, value in cfg.items():
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                        (key, json.dumps(value), now)
+                    )
+                
+                # Commit the transaction
+                cursor.execute("COMMIT")
+            except Exception as e:
+                # Rollback on any error
+                cursor.execute("ROLLBACK")
+                log(f"Error saving config, transaction rolled back: {e}")
+                raise
+        finally:
+            # Restore original isolation level
+            db.isolation_level = old_isolation
         
         # Update in-memory config after successful save
         with CONFIG_LOCK:
