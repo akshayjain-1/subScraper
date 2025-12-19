@@ -2654,9 +2654,11 @@ def add_completed_job(domain: str, job_data: Dict[str, Any]) -> None:
     Keeps only the last MAX_COMPLETED_JOBS_PER_DOMAIN jobs per domain.
     """
     with JOB_LOCK:
-        # Remove thread reference as it's not serializable
-        job_copy = copy.deepcopy(job_data)
-        job_copy.pop("thread", None)
+        # Remove thread reference before deepcopy as it's not serializable
+        # Thread objects contain locks that cannot be pickled
+        job_data_copy = dict(job_data)
+        job_data_copy.pop("thread", None)
+        job_copy = copy.deepcopy(job_data_copy)
         
         # Add completion timestamp
         completion_time = datetime.now(timezone.utc)
@@ -5338,8 +5340,16 @@ def _start_job_thread(job: Dict[str, Any]) -> None:
             with JOB_LOCK:
                 job_record = RUNNING_JOBS.get(domain)
                 if job_record:
-                    # Make a deep copy while we have the lock
-                    job_to_save = copy.deepcopy(job_record)
+                    # Remove thread reference before deepcopy to avoid pickle errors
+                    # Thread objects contain locks that cannot be pickled
+                    thread_ref = job_record.pop("thread", None)
+                    try:
+                        # Make a deep copy while we have the lock
+                        job_to_save = copy.deepcopy(job_record)
+                    finally:
+                        # Restore thread reference in case it's needed (defensive)
+                        if thread_ref is not None:
+                            job_record["thread"] = thread_ref
                 RUNNING_JOBS.pop(domain, None)
             
             # Save outside the lock to avoid deadlock (add_completed_job acquires lock)
