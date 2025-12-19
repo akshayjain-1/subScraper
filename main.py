@@ -183,7 +183,7 @@ GLOBAL_RATE_LIMIT_DELAY = 0.0  # seconds between tool calls (0 = no rate limit)
 TIMEOUT_TRACKER_LOCK = threading.Lock()
 TIMEOUT_TRACKER: Dict[str, Dict[str, Any]] = {}  # domain -> {errors: int, last_error_time: float, backoff_delay: float}
 TIMEOUT_ERROR_THRESHOLD = 3  # Number of errors before increasing rate limit
-TIMEOUT_BACKOFF_INCREMENT = 2.0  # Seconds to add to delay after threshold
+TIMEOUT_BACKOFF_INCREMENT = 5.0  # Seconds to add to delay after threshold (increased from 2.0 to back off more aggressively)
 MAX_AUTO_BACKOFF_DELAY = 30.0  # Maximum automatic backoff delay
 
 STEP_PROGRESS = {
@@ -2112,24 +2112,37 @@ def get_auto_backup_status() -> Dict[str, Any]:
 
 
 def save_config(cfg: Dict[str, Any]) -> None:
-    """Save configuration to SQLite database."""
+    """Save configuration to SQLite database with proper error handling."""
     ensure_dirs()
-    db = get_db()
-    cursor = db.cursor()
-    now = datetime.now(timezone.utc).isoformat()
     
-    for key, value in cfg.items():
-        cursor.execute(
-            "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
-            (key, json.dumps(value), now)
-        )
-    
-    db.commit()
-    
-    with CONFIG_LOCK:
-        CONFIG.clear()
-        CONFIG.update(cfg)
-    apply_concurrency_limits(cfg)
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Use a transaction to ensure all-or-nothing save
+        cursor.execute("BEGIN IMMEDIATE")
+        try:
+            for key, value in cfg.items():
+                cursor.execute(
+                    "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                    (key, json.dumps(value), now)
+                )
+            
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            log(f"Error saving config to database: {e}")
+            raise
+        
+        # Update in-memory config after successful save
+        with CONFIG_LOCK:
+            CONFIG.clear()
+            CONFIG.update(cfg)
+        apply_concurrency_limits(cfg)
+    except Exception as e:
+        log(f"Failed to save configuration: {e}")
+        raise
 
 
 def load_config() -> Dict[str, Any]:
@@ -2468,11 +2481,15 @@ def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str,
     return True, "No changes applied.", cfg
 
 
-def acquire_lock(timeout: int = 10) -> None:
+def acquire_lock(timeout: int = 30) -> None:
     """
-    Very simple file lock; best-effort to avoid concurrent writes.
+    Very simple file lock with exponential backoff; best-effort to avoid concurrent writes.
+    Increased timeout from 10s to 30s and added exponential backoff to reduce contention.
     """
     start = time.time()
+    retry_delay = 0.1  # Start with 100ms
+    max_retry_delay = 2.0  # Cap at 2 seconds
+    
     while True:
         try:
             # use exclusive create
@@ -2480,10 +2497,13 @@ def acquire_lock(timeout: int = 10) -> None:
             os.close(fd)
             return
         except FileExistsError:
-            if time.time() - start > timeout:
+            elapsed = time.time() - start
+            if elapsed > timeout:
                 log("Lock timeout reached, proceeding anyway (best effort).")
                 return
-            time.sleep(0.1)
+            time.sleep(retry_delay)
+            # Exponential backoff: increase delay for next retry
+            retry_delay = min(retry_delay * 1.5, max_retry_delay)
 
 
 def release_lock() -> None:
