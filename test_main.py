@@ -585,6 +585,66 @@ class TestUtilityFunctions:
         assert main.is_rate_limit_error(error_normal) == False
 
 
+class TestToolConcurrencyLimits:
+    """Tests for tool concurrency limits and gates"""
+    
+    def test_all_tools_have_gates(self):
+        """Test that all tools in TOOLS have corresponding TOOL_GATES"""
+        # All tools should have gates
+        expected_tools = set(main.TOOLS.keys())
+        actual_gates = set(main.TOOL_GATES.keys())
+        
+        # Check that all expected tools have gates
+        assert expected_tools == actual_gates, \
+            f"Missing gates: {expected_tools - actual_gates}, Extra gates: {actual_gates - expected_tools}"
+    
+    def test_all_tools_have_config_settings(self):
+        """Test that all tools have max_parallel_* config settings"""
+        config = main.default_config()
+        
+        for tool in main.TOOLS.keys():
+            # Convert tool name to config key (e.g., "github-subdomains" -> "max_parallel_github_subdomains")
+            config_key = f"max_parallel_{tool.replace('-', '_')}"
+            assert config_key in config, f"Missing config setting: {config_key}"
+            assert isinstance(config[config_key], int), f"Config {config_key} should be an integer"
+            assert config[config_key] >= 1, f"Config {config_key} should be >= 1"
+    
+    def test_apply_concurrency_limits_updates_gates(self):
+        """Test that apply_concurrency_limits properly updates tool gates"""
+        # Create test config with custom limits
+        test_config = main.default_config()
+        test_config['max_parallel_amass'] = 5
+        test_config['max_parallel_subfinder'] = 3
+        test_config['max_parallel_httpx'] = 7
+        
+        # Apply limits
+        main.apply_concurrency_limits(test_config)
+        
+        # Verify gates were updated
+        assert main.TOOL_GATES['amass'].snapshot()['limit'] == 5
+        assert main.TOOL_GATES['subfinder'].snapshot()['limit'] == 3
+        assert main.TOOL_GATES['httpx'].snapshot()['limit'] == 7
+    
+    def test_gate_snapshot_returns_correct_data(self):
+        """Test that gate snapshot returns limit and active count"""
+        gate = main.ToolGate(3)
+        snapshot = gate.snapshot()
+        
+        assert 'limit' in snapshot
+        assert 'active' in snapshot
+        assert snapshot['limit'] == 3
+        assert snapshot['active'] == 0
+        
+        # Acquire and check again
+        gate.acquire()
+        snapshot = gate.snapshot()
+        assert snapshot['active'] == 1
+        
+        gate.release()
+        snapshot = gate.snapshot()
+        assert snapshot['active'] == 0
+
+
 if __name__ == '__main__':
     # Run tests with pytest
     pytest.main([__file__, '-v', '--tb=short'])
