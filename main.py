@@ -5572,23 +5572,30 @@ def load_domain_history(domain: str, limit: Optional[int] = None) -> List[Dict[s
     
     Returns:
         List of history events in chronological order (oldest first)
+    
+    Note:
+        Uses ORDER BY timestamp DESC, id DESC to ensure consistent ordering
+        when multiple entries have the same timestamp. The id DESC ensures
+        that within the same timestamp, newer entries (higher id) come first
+        in the DESC sort, maintaining insertion order.
     """
     db = get_db()
     cursor = db.cursor()
     
     if limit is not None and limit > 0:
-        # Efficiently get the last N entries by ordering DESC, limiting, then reversing
-        # This avoids loading all entries into memory
+        # Efficiently get the last N entries using a subquery
+        # Inner query: get last N entries ordered DESC (including id for proper ordering)
+        # Outer query: re-order them ASC for chronological display
         cursor.execute(
-            """SELECT timestamp, source, text FROM history 
-               WHERE domain = ? 
-               ORDER BY timestamp DESC, id DESC
-               LIMIT ?""",
+            """SELECT timestamp, source, text FROM (
+                   SELECT id, timestamp, source, text FROM history 
+                   WHERE domain = ? 
+                   ORDER BY timestamp DESC, id DESC
+                   LIMIT ?
+               ) ORDER BY timestamp ASC, id ASC""",
             (domain, limit)
         )
         rows = cursor.fetchall()
-        # Reverse to get chronological order (oldest first)
-        rows = list(reversed(rows))
     else:
         # Load all entries (for backward compatibility, though not recommended for large datasets)
         cursor.execute(
@@ -11061,8 +11068,9 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
                 except (TypeError, ValueError):
                     limit = 200
             try:
-                # Load history with limit to avoid performance issues with large datasets
-                # The limit is used for filtering, so we load more than needed
+                # Load up to 5000 recent entries from database for command filtering
+                # This is a reasonable upper bound since we filter for commands (which are ~10% of logs)
+                # and then slice to the requested limit (default 200, max 2000)
                 events = load_domain_history(domain, limit=5000)
             except RuntimeError as exc:
                 self._send_json({"success": False, "message": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
