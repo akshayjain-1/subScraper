@@ -2435,17 +2435,26 @@ def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str,
 
     concurrency_fields = {
         "max_running_jobs": "Max concurrent jobs",
+        "max_parallel_amass": "Amass parallel slots",
+        "max_parallel_subfinder": "Subfinder parallel slots",
+        "max_parallel_assetfinder": "Assetfinder parallel slots",
+        "max_parallel_findomain": "Findomain parallel slots",
+        "max_parallel_sublist3r": "Sublist3r parallel slots",
+        "max_parallel_crtsh": "Crt.sh parallel slots",
+        "max_parallel_github_subdomains": "GitHub-Subdomains parallel slots",
+        "max_parallel_dnsx": "DNSx parallel slots",
+        "max_parallel_httpx": "HTTPx parallel slots",
         "max_parallel_ffuf": "FFUF parallel slots",
+        "max_parallel_waybackurls": "Waybackurls parallel slots",
+        "max_parallel_gau": "GAU parallel slots",
+        "max_parallel_nmap": "Nmap parallel slots",
         "max_parallel_nuclei": "Nuclei parallel slots",
         "max_parallel_nikto": "Nikto parallel slots",
+        "max_parallel_gowitness": "Screenshot parallel slots",
         "subfinder_threads": "Subfinder threads",
         "assetfinder_threads": "Assetfinder threads",
         "findomain_threads": "Findomain threads",
         "amass_timeout": "Amass timeout (seconds)",
-        "max_parallel_gowitness": "Screenshot parallel slots",
-        "max_parallel_dnsx": "DNSx parallel slots",
-        "max_parallel_waybackurls": "Waybackurls parallel slots",
-        "max_parallel_gau": "GAU parallel slots",
     }
     for field, label in concurrency_fields.items():
         if field in values:
@@ -6581,8 +6590,51 @@ button:hover { background:#1d4ed8; }
                 <input id="settings-findomain-threads" type="number" name="findomain_threads" min="1" />
               </label>
               <h4>Per-Tool Parallel Slots</h4>
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">Subdomain Enumeration Tools</h5>
+              <label>Amass parallel slots
+                <input id="settings-amass" type="number" name="max_parallel_amass" min="1" />
+              </label>
+              <label>Subfinder parallel slots
+                <input id="settings-subfinder" type="number" name="max_parallel_subfinder" min="1" />
+              </label>
+              <label>Assetfinder parallel slots
+                <input id="settings-assetfinder" type="number" name="max_parallel_assetfinder" min="1" />
+              </label>
+              <label>Findomain parallel slots
+                <input id="settings-findomain" type="number" name="max_parallel_findomain" min="1" />
+              </label>
+              <label>Sublist3r parallel slots
+                <input id="settings-sublist3r" type="number" name="max_parallel_sublist3r" min="1" />
+              </label>
+              <label>Crt.sh parallel slots
+                <input id="settings-crtsh" type="number" name="max_parallel_crtsh" min="1" />
+              </label>
+              <label>GitHub-Subdomains parallel slots
+                <input id="settings-github-subdomains" type="number" name="max_parallel_github_subdomains" min="1" />
+              </label>
+              
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">DNS & HTTP Tools</h5>
+              <label>DNSx parallel slots
+                <input id="settings-dnsx" type="number" name="max_parallel_dnsx" min="1" />
+              </label>
+              <label>HTTPx parallel slots
+                <input id="settings-httpx" type="number" name="max_parallel_httpx" min="1" />
+              </label>
               <label>FFUF parallel slots
                 <input id="settings-ffuf" type="number" name="max_parallel_ffuf" min="1" />
+              </label>
+              
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">URL Discovery Tools</h5>
+              <label>Waybackurls parallel slots
+                <input id="settings-waybackurls" type="number" name="max_parallel_waybackurls" min="1" />
+              </label>
+              <label>GAU parallel slots
+                <input id="settings-gau" type="number" name="max_parallel_gau" min="1" />
+              </label>
+              
+              <h5 style="color: var(--muted); font-size: 14px; margin-top: 16px;">Scanning & Analysis Tools</h5>
+              <label>Nmap parallel slots
+                <input id="settings-nmap" type="number" name="max_parallel_nmap" min="1" />
               </label>
               <label>Nuclei parallel slots
                 <input id="settings-nuclei" type="number" name="max_parallel_nuclei" min="1" />
@@ -6592,15 +6644,6 @@ button:hover { background:#1d4ed8; }
               </label>
               <label>Screenshot parallel slots
                 <input id="settings-gowitness" type="number" name="max_parallel_gowitness" min="1" />
-              </label>
-              <label>DNSx parallel slots
-                <input id="settings-dnsx" type="number" name="max_parallel_dnsx" min="1" />
-              </label>
-              <label>Waybackurls parallel slots
-                <input id="settings-waybackurls" type="number" name="max_parallel_waybackurls" min="1" />
-              </label>
-              <label>GAU parallel slots
-                <input id="settings-gau" type="number" name="max_parallel_gau" min="1" />
               </label>
             </div>
             
