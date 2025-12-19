@@ -2116,33 +2116,45 @@ def save_config(cfg: Dict[str, Any]) -> None:
     ensure_dirs()
     
     try:
-        db = get_db()
+        db = get_db()  # get_db() uses DB_LOCK internally
         cursor = db.cursor()
         now = datetime.now(timezone.utc).isoformat()
         
-        # Use a transaction to ensure all-or-nothing save
-        cursor.execute("BEGIN IMMEDIATE")
+        # Temporarily set isolation_level to enable proper transaction handling
+        # Note: Connection is normally in autocommit mode (isolation_level=None)
+        # We need to switch to manual transaction mode for atomic save
+        old_isolation = db.isolation_level
         try:
-            for key, value in cfg.items():
-                cursor.execute(
-                    "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
-                    (key, json.dumps(value), now)
-                )
+            # Switch to manual transaction mode (empty string enables manual control)
+            db.isolation_level = ''
             
-            db.commit()
-        except sqlite3.Error as e:
-            db.rollback()
-            log(f"Database error saving config: {e}")
-            raise
-        except Exception as e:
-            db.rollback()
-            log(f"Unexpected error saving config to database: {e}")
-            raise
+            # Now start an explicit transaction with IMMEDIATE lock
+            # This provides exclusive write access and prevents concurrent modifications
+            cursor.execute("BEGIN IMMEDIATE")
+            try:
+                for key, value in cfg.items():
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                        (key, json.dumps(value), now)
+                    )
+                
+                # Commit the transaction using connection-level method
+                db.commit()
+            except Exception as e:
+                # Rollback on any error using connection-level method
+                db.rollback()
+                log(f"Error saving config, transaction rolled back: {e}")
+                raise
+        finally:
+            # Restore original isolation level
+            db.isolation_level = old_isolation
         
         # Update in-memory config after successful save
         with CONFIG_LOCK:
             CONFIG.clear()
             CONFIG.update(cfg)
+        
+        # Apply concurrency limits
         apply_concurrency_limits(cfg)
     except Exception as e:
         log(f"Failed to save configuration: {e}")
@@ -5549,18 +5561,50 @@ def append_domain_history(domain: str, entry: Dict[str, Any]) -> None:
         log(f"Failed to write history for {domain}: {exc}")
 
 
-def load_domain_history(domain: str) -> List[Dict[str, Any]]:
-    """Load domain history from SQLite database."""
+def load_domain_history(domain: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Load domain history from SQLite database.
+    
+    Args:
+        domain: The domain to load history for
+        limit: Maximum number of recent entries to return (None = all entries)
+               When limit is specified, returns the most recent entries.
+    
+    Returns:
+        List of history events in chronological order (oldest first)
+    
+    Note:
+        Uses ORDER BY timestamp DESC, id DESC to ensure consistent ordering
+        when multiple entries have the same timestamp. The id DESC ensures
+        that within the same timestamp, newer entries (higher id) come first
+        in the DESC sort, maintaining insertion order.
+    """
     db = get_db()
     cursor = db.cursor()
     
-    cursor.execute(
-        """SELECT timestamp, source, text FROM history 
-           WHERE domain = ? 
-           ORDER BY timestamp ASC""",
-        (domain,)
-    )
-    rows = cursor.fetchall()
+    if limit is not None and limit > 0:
+        # Efficiently get the last N entries using a subquery
+        # Inner query: get last N entries ordered DESC (including id for proper ordering)
+        # Outer query: re-order them ASC for chronological display
+        cursor.execute(
+            """SELECT timestamp, source, text FROM (
+                   SELECT id, timestamp, source, text FROM history 
+                   WHERE domain = ? 
+                   ORDER BY timestamp DESC, id DESC
+                   LIMIT ?
+               ) ORDER BY timestamp ASC, id ASC""",
+            (domain, limit)
+        )
+        rows = cursor.fetchall()
+    else:
+        # Load all entries (for backward compatibility, though not recommended for large datasets)
+        cursor.execute(
+            """SELECT timestamp, source, text FROM history 
+               WHERE domain = ? 
+               ORDER BY timestamp ASC""",
+            (domain,)
+        )
+        rows = cursor.fetchall()
     
     events = []
     for row in rows:
@@ -10833,7 +10877,8 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
                     return
                 sub_data = target["subdomains"][subdomain]
                 try:
-                    history = load_domain_history(domain)
+                    # Load only recent history for subdomain detail page (limit for performance)
+                    history = load_domain_history(domain, limit=1000)
                 except Exception:
                     history = []
                 self._send_json({
@@ -11023,7 +11068,10 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
                 except (TypeError, ValueError):
                     limit = 200
             try:
-                events = load_domain_history(domain)
+                # Load up to 5000 recent entries from database for command filtering
+                # This is a reasonable upper bound since we filter for commands (which are ~10% of logs)
+                # and then slice to the requested limit (default 200, max 2000)
+                events = load_domain_history(domain, limit=5000)
             except RuntimeError as exc:
                 self._send_json({"success": False, "message": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
                 return
@@ -11040,11 +11088,12 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
                 self._send_json({"success": False, "message": "domain parameter required"}, status=HTTPStatus.BAD_REQUEST)
                 return
             try:
-                events = load_domain_history(domain)
+                # Load only the last 1000 events directly from database for better performance
+                events = load_domain_history(domain, limit=1000)
             except RuntimeError as exc:
                 self._send_json({"success": False, "message": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
                 return
-            self._send_json({"domain": domain, "events": events[-1000:]})
+            self._send_json({"domain": domain, "events": events})
             return
         if self.path == "/api/export/state":
             data = json.dumps(load_state(), indent=2).encode("utf-8")
