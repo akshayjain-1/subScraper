@@ -2155,7 +2155,12 @@ def save_config(cfg: Dict[str, Any]) -> None:
             CONFIG.update(cfg)
         
         # Apply concurrency limits
-        apply_concurrency_limits(cfg)
+        # Wrap in try-except to prevent config save from failing if applying limits fails
+        try:
+            apply_concurrency_limits(cfg)
+        except Exception as apply_err:
+            log(f"Warning: Config saved successfully but failed to apply concurrency limits: {apply_err}")
+            # Don't re-raise - config was saved successfully, we just couldn't apply the runtime changes
     except Exception as e:
         log(f"Failed to save configuration: {e}")
         raise
@@ -2187,7 +2192,15 @@ def load_config() -> Dict[str, Any]:
     with CONFIG_LOCK:
         CONFIG.clear()
         CONFIG.update(cfg)
-    apply_concurrency_limits(cfg)
+    
+    # Apply concurrency limits
+    # Wrap in try-except to prevent config load from failing if applying limits fails
+    try:
+        apply_concurrency_limits(cfg)
+    except Exception as apply_err:
+        log(f"Warning: Config loaded successfully but failed to apply concurrency limits: {apply_err}")
+        # Don't re-raise - config was loaded successfully, we just couldn't apply the runtime changes
+    
     return dict(CONFIG)
 
 
@@ -6662,7 +6675,7 @@ button:hover { background:#1d4ed8; }
             </div>
           </div>
 
-          <button type="submit">Save Settings</button>
+          <button type="submit" onclick="if(window.saveSettingsNow){console.log('[DEBUG] Button onclick fired'); window.saveSettingsNow(); return false;} else {console.error('[DEBUG] saveSettingsNow not defined yet');}">Save Settings</button>
           <div class="status" id="settings-status"></div>
         </form>
       </div>
@@ -6713,6 +6726,7 @@ button:hover { background:#1d4ed8; }
   </div>
 </div>
 <script>
+console.log('[DEBUG] Script loading started');
 const navLinks = document.querySelectorAll('.nav-link');
 const viewSections = document.querySelectorAll('.module');
 const SEVERITY_SCALE = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'NONE'];
@@ -6821,6 +6835,8 @@ const createBackupBtn = document.getElementById('create-backup-btn');
 const backupList = document.getElementById('backup-list');
 const settingsStatus = document.getElementById('settings-status');
 const settingsSummary = document.getElementById('settings-summary');
+const settingsSaveBtn = document.querySelector('#settings-form button[type="submit"]');
+console.log('[DEBUG] All DOM elements retrieved, settingsForm:', settingsForm ? 'found' : 'NULL', 'saveBtn:', settingsSaveBtn ? 'found' : 'NULL');
 const templateInputs = {
   amass: document.getElementById('template-amass'),
   subfinder: document.getElementById('template-subfinder'),
@@ -9069,7 +9085,12 @@ async function fetchState() {
 }
 
 launchForm.addEventListener('input', () => { launchFormDirty = true; });
-settingsForm.addEventListener('input', () => { settingsFormDirty = true; });
+
+if (settingsForm) {
+  settingsForm.addEventListener('input', () => { settingsFormDirty = true; });
+} else {
+  console.error('Settings form not found!');
+}
 
 targetsList.addEventListener('click', (event) => {
   const btn = event.target.closest('.sub-link');
@@ -9115,72 +9136,136 @@ launchForm.addEventListener('submit', async (event) => {
   }
 });
 
-settingsForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const payload = {
-    default_wordlist: settingsWordlist.value,
-    default_interval: settingsInterval.value,
-    wildcard_tlds: settingsWildcardTlds.value,
-    skip_nikto_by_default: settingsSkipNikto.checked,
-    enable_screenshots: settingsEnableScreenshots.checked,
-    enable_amass: settingsEnableAmass.checked,
-    amass_timeout: settingsAmassTimeout.value,
-    enable_subfinder: settingsEnableSubfinder.checked,
-    enable_assetfinder: settingsEnableAssetfinder.checked,
-    enable_findomain: settingsEnableFindomain.checked,
-    enable_sublist3r: settingsEnableSublist3r.checked,
-    enable_crtsh: settingsEnableCrtsh.checked,
-    enable_github_subdomains: settingsEnableGithubSubdomains.checked,
-    enable_dnsx: settingsEnableDnsx.checked,
-    enable_waybackurls: settingsEnableWaybackurls.checked,
-    enable_gau: settingsEnableGau.checked,
-    subfinder_threads: settingsSubfinderThreads.value,
-    assetfinder_threads: settingsAssetfinderThreads.value,
-    findomain_threads: settingsFindomainThreads.value,
-    global_rate_limit: settingsGlobalRateLimit.value,
-    max_running_jobs: settingsMaxJobs.value,
-    max_parallel_ffuf: settingsFFUF.value,
-    max_parallel_nuclei: settingsNuclei.value,
-    max_parallel_nikto: settingsNikto.value,
-    max_parallel_gowitness: settingsGowitness.value,
-    max_parallel_dnsx: settingsDnsx.value,
-    max_parallel_waybackurls: settingsWaybackurls.value,
-    max_parallel_gau: settingsGau.value,
-    dynamic_mode_enabled: settingsDynamicMode.checked,
-    dynamic_mode_base_jobs: settingsDynamicBaseJobs.value,
-    dynamic_mode_max_jobs: settingsDynamicMaxJobs.value,
-    dynamic_mode_cpu_threshold: settingsDynamicCpuThreshold.value,
-    dynamic_mode_memory_threshold: settingsDynamicMemoryThreshold.value,
-    auto_backup_enabled: settingsAutoBackupEnabled.checked,
-    auto_backup_interval: settingsAutoBackupInterval.value,
-    auto_backup_max_count: settingsAutoBackupMaxCount.value,
-  };
-  const templatePayload = {};
-  Object.entries(templateInputs).forEach(([key, el]) => {
-    if (!el) return;
-    templatePayload[key] = el.value || '';
-  });
-  payload.tool_flag_templates = templatePayload;
-  settingsStatus.textContent = 'Saving...';
-  settingsStatus.className = 'status';
-  try {
-    const resp = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await resp.json();
-    settingsStatus.textContent = data.message || 'Saved';
-    settingsStatus.className = 'status ' + (data.success ? 'success' : 'error');
-    if (data.success) {
-      settingsFormDirty = false;
-      fetchState();
+if (settingsForm) {
+  // Create the save settings function that can be called from anywhere
+  window.saveSettingsNow = async function() {
+    try {
+      console.log('[DEBUG] saveSettingsNow called');
+      
+      // Validate all required elements exist
+      if (!settingsStatus) {
+        console.error('settingsStatus element not found');
+        alert('Error: Settings status element not found. Please refresh the page.');
+        return;
+      }
+      
+      settingsStatus.textContent = 'Saving...';
+      settingsStatus.className = 'status';
+      
+      const payload = {
+        default_wordlist: settingsWordlist ? settingsWordlist.value : '',
+        default_interval: settingsInterval ? settingsInterval.value : '',
+        wildcard_tlds: settingsWildcardTlds ? settingsWildcardTlds.value : '',
+        skip_nikto_by_default: settingsSkipNikto ? settingsSkipNikto.checked : false,
+        enable_screenshots: settingsEnableScreenshots ? settingsEnableScreenshots.checked : true,
+        enable_amass: settingsEnableAmass ? settingsEnableAmass.checked : true,
+        amass_timeout: settingsAmassTimeout ? settingsAmassTimeout.value : '',
+        enable_subfinder: settingsEnableSubfinder ? settingsEnableSubfinder.checked : true,
+        enable_assetfinder: settingsEnableAssetfinder ? settingsEnableAssetfinder.checked : true,
+        enable_findomain: settingsEnableFindomain ? settingsEnableFindomain.checked : true,
+        enable_sublist3r: settingsEnableSublist3r ? settingsEnableSublist3r.checked : true,
+        enable_crtsh: settingsEnableCrtsh ? settingsEnableCrtsh.checked : true,
+        enable_github_subdomains: settingsEnableGithubSubdomains ? settingsEnableGithubSubdomains.checked : true,
+        enable_dnsx: settingsEnableDnsx ? settingsEnableDnsx.checked : true,
+        enable_waybackurls: settingsEnableWaybackurls ? settingsEnableWaybackurls.checked : true,
+        enable_gau: settingsEnableGau ? settingsEnableGau.checked : true,
+        subfinder_threads: settingsSubfinderThreads ? settingsSubfinderThreads.value : '',
+        assetfinder_threads: settingsAssetfinderThreads ? settingsAssetfinderThreads.value : '',
+        findomain_threads: settingsFindomainThreads ? settingsFindomainThreads.value : '',
+        global_rate_limit: settingsGlobalRateLimit ? settingsGlobalRateLimit.value : '',
+        max_running_jobs: settingsMaxJobs ? settingsMaxJobs.value : '',
+        max_parallel_ffuf: settingsFFUF ? settingsFFUF.value : '',
+        max_parallel_nuclei: settingsNuclei ? settingsNuclei.value : '',
+        max_parallel_nikto: settingsNikto ? settingsNikto.value : '',
+        max_parallel_gowitness: settingsGowitness ? settingsGowitness.value : '',
+        max_parallel_dnsx: settingsDnsx ? settingsDnsx.value : '',
+        max_parallel_waybackurls: settingsWaybackurls ? settingsWaybackurls.value : '',
+        max_parallel_gau: settingsGau ? settingsGau.value : '',
+        dynamic_mode_enabled: settingsDynamicMode ? settingsDynamicMode.checked : false,
+        dynamic_mode_base_jobs: settingsDynamicBaseJobs ? settingsDynamicBaseJobs.value : '',
+        dynamic_mode_max_jobs: settingsDynamicMaxJobs ? settingsDynamicMaxJobs.value : '',
+        dynamic_mode_cpu_threshold: settingsDynamicCpuThreshold ? settingsDynamicCpuThreshold.value : '',
+        dynamic_mode_memory_threshold: settingsDynamicMemoryThreshold ? settingsDynamicMemoryThreshold.value : '',
+        auto_backup_enabled: settingsAutoBackupEnabled ? settingsAutoBackupEnabled.checked : false,
+        auto_backup_interval: settingsAutoBackupInterval ? settingsAutoBackupInterval.value : '',
+        auto_backup_max_count: settingsAutoBackupMaxCount ? settingsAutoBackupMaxCount.value : '',
+      };
+      
+      const templatePayload = {};
+      Object.entries(templateInputs).forEach(([key, el]) => {
+        if (!el) return;
+        templatePayload[key] = el.value || '';
+      });
+      payload.tool_flag_templates = templatePayload;
+      
+      console.log('Sending settings payload:', payload);
+      
+      const resp = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      
+      console.log('Response status:', resp.status);
+      const data = await resp.json();
+      console.log('Response data:', data);
+      
+      settingsStatus.textContent = data.message || 'Saved';
+      settingsStatus.className = 'status ' + (data.success ? 'success' : 'error');
+      if (data.success) {
+        settingsFormDirty = false;
+        fetchState();
+      }
+    } catch (err) {
+      console.error('Settings form submission error:', err);
+      if (settingsStatus) {
+        settingsStatus.textContent = 'Error: ' + err.message;
+        settingsStatus.className = 'status error';
+      } else {
+        alert('Error saving settings: ' + err.message);
+      }
     }
-  } catch (err) {
-    settingsStatus.textContent = err.message;
-    settingsStatus.className = 'status error';
+  };
+  
+  // Attach to form submit event
+  settingsForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    console.log('[DEBUG] Form submit event fired');
+    await window.saveSettingsNow();
+  }, true); // Use capture phase
+  
+  // Also add a direct button click handler with capture
+  if (settingsSaveBtn) {
+    settingsSaveBtn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      console.log('[DEBUG] Save button clicked directly (addEventListener), calling saveSettingsNow');
+      await window.saveSettingsNow();
+    }, true); // Use capture phase to intercept before any other handler
+  } else {
+    console.error('[DEBUG] settingsSaveBtn not found!');
   }
-});
+  
+  // Add Enter key support for all settings inputs with capture
+  const settingsInputs = settingsForm.querySelectorAll('input, textarea, select');
+  console.log('[DEBUG] Found', settingsInputs.length, 'form inputs for Enter key binding');
+  settingsInputs.forEach(input => {
+    input.addEventListener('keydown', async (event) => {
+      if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        console.log('[DEBUG] Enter pressed in', event.target.id || event.target.name, ', calling saveSettingsNow');
+        await window.saveSettingsNow();
+      }
+    }, true); // Use capture phase
+  });
+  
+  console.log('[DEBUG] Settings form handlers attached. Form ID:', settingsForm.id, 'Button:', settingsSaveBtn ? 'found' : 'NOT FOUND');
+} else {
+  console.error('Cannot attach submit handler: settingsForm is null');
+}
 
 // API Keys functionality
 const apiKeysForm = document.getElementById('api-keys-form');
@@ -9847,6 +9932,7 @@ attachSubdomainFilters = function(detailEl) {
   }
 };
 
+console.log('[DEBUG] Script execution complete, starting event handlers and fetch');
 renderWorkflowDiagram();
 fetchState();
 setInterval(fetchState, POLL_INTERVAL);
