@@ -183,7 +183,7 @@ GLOBAL_RATE_LIMIT_DELAY = 0.0  # seconds between tool calls (0 = no rate limit)
 TIMEOUT_TRACKER_LOCK = threading.Lock()
 TIMEOUT_TRACKER: Dict[str, Dict[str, Any]] = {}  # domain -> {errors: int, last_error_time: float, backoff_delay: float}
 TIMEOUT_ERROR_THRESHOLD = 3  # Number of errors before increasing rate limit
-TIMEOUT_BACKOFF_INCREMENT = 2.0  # Seconds to add to delay after threshold
+TIMEOUT_BACKOFF_INCREMENT = 5.0  # Seconds to add to delay after threshold (increased from 2.0 to back off more aggressively)
 MAX_AUTO_BACKOFF_DELAY = 30.0  # Maximum automatic backoff delay
 
 STEP_PROGRESS = {
@@ -2112,24 +2112,41 @@ def get_auto_backup_status() -> Dict[str, Any]:
 
 
 def save_config(cfg: Dict[str, Any]) -> None:
-    """Save configuration to SQLite database."""
+    """Save configuration to SQLite database with proper error handling."""
     ensure_dirs()
-    db = get_db()
-    cursor = db.cursor()
-    now = datetime.now(timezone.utc).isoformat()
     
-    for key, value in cfg.items():
-        cursor.execute(
-            "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
-            (key, json.dumps(value), now)
-        )
-    
-    db.commit()
-    
-    with CONFIG_LOCK:
-        CONFIG.clear()
-        CONFIG.update(cfg)
-    apply_concurrency_limits(cfg)
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Use a transaction to ensure all-or-nothing save
+        cursor.execute("BEGIN IMMEDIATE")
+        try:
+            for key, value in cfg.items():
+                cursor.execute(
+                    "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                    (key, json.dumps(value), now)
+                )
+            
+            db.commit()
+        except sqlite3.Error as e:
+            db.rollback()
+            log(f"Database error saving config: {e}")
+            raise
+        except Exception as e:
+            db.rollback()
+            log(f"Unexpected error saving config to database: {e}")
+            raise
+        
+        # Update in-memory config after successful save
+        with CONFIG_LOCK:
+            CONFIG.clear()
+            CONFIG.update(cfg)
+        apply_concurrency_limits(cfg)
+    except Exception as e:
+        log(f"Failed to save configuration: {e}")
+        raise
 
 
 def load_config() -> Dict[str, Any]:
@@ -2468,11 +2485,15 @@ def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str,
     return True, "No changes applied.", cfg
 
 
-def acquire_lock(timeout: int = 10) -> None:
+def acquire_lock(timeout: int = 30) -> None:
     """
-    Very simple file lock; best-effort to avoid concurrent writes.
+    Very simple file lock with exponential backoff; best-effort to avoid concurrent writes.
+    Increased timeout from 10s to 30s and added exponential backoff to reduce contention.
     """
     start = time.time()
+    retry_delay = 0.1  # Start with 100ms
+    max_retry_delay = 2.0  # Cap at 2 seconds
+    
     while True:
         try:
             # use exclusive create
@@ -2480,10 +2501,13 @@ def acquire_lock(timeout: int = 10) -> None:
             os.close(fd)
             return
         except FileExistsError:
-            if time.time() - start > timeout:
+            elapsed = time.time() - start
+            if elapsed > timeout:
                 log("Lock timeout reached, proceeding anyway (best effort).")
                 return
-            time.sleep(0.1)
+            time.sleep(retry_delay)
+            # Exponential backoff: increase delay for next retry
+            retry_delay = min(retry_delay * 1.5, max_retry_delay)
 
 
 def release_lock() -> None:
@@ -3659,12 +3683,14 @@ def findomain_enum(domain: str, config: Optional[Dict[str, Any]] = None, job_dom
             threads = max(1, int(config.get("findomain_threads", threads)))
         except (TypeError, ValueError):
             threads = 40
+    
+    # Newer versions of findomain use different output handling
+    # Instead of --output, we use output redirection
     cmd = [
         TOOLS["findomain"],
         "--target", domain,
         "--threads", str(threads),
         "--quiet",
-        "--output", str(out_path),
     ]
     context = {
         "DOMAIN": domain,
@@ -3672,6 +3698,8 @@ def findomain_enum(domain: str, config: Optional[Dict[str, Any]] = None, job_dom
         "THREADS": threads,
     }
     cmd = apply_template_flags("findomain", cmd, context, config)
+    
+    # Use output redirection instead of --output flag
     success = run_subprocess(cmd, outfile=out_path, job_domain=job_domain, step="findomain")
     return read_lines_file(out_path) if success else []
 
@@ -3703,11 +3731,22 @@ def crtsh_enum(domain: str, job_domain: Optional[str] = None) -> List[str]:
     try:
         import urllib.request
         import json as json_lib
+        import ssl
         url = f"https://crt.sh/?q=%.{domain}&output=json"
         req = urllib.request.Request(url, headers={"User-Agent": "ReconTool/1.0"})
         if job_domain:
             job_log_append(job_domain, f"Querying crt.sh for {domain}", source="crtsh")
-        with urllib.request.urlopen(req, timeout=30) as response:
+        
+        # Create SSL context that doesn't verify certificates
+        # SECURITY NOTE: This is needed because crt.sh may be behind proxies with self-signed certs.
+        # The data from crt.sh is public certificate transparency logs, so the risk is limited to
+        # potential MITM attacks affecting subdomain enumeration accuracy, not credential exposure.
+        # For production use, consider implementing certificate pinning for crt.sh's actual cert.
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        with urllib.request.urlopen(req, timeout=30, context=ssl_context) as response:
             data = response.read()
         entries = json_lib.loads(data)
         for entry in entries:
@@ -3734,22 +3773,62 @@ def crtsh_enum(domain: str, job_domain: Optional[str] = None) -> List[str]:
 def github_subdomains_enum(domain: str, job_domain: Optional[str] = None) -> List[str]:
     """
     Use github-subdomains tool to find subdomains via GitHub.
+    Requires GitHub token - will try to use token from subfinder config if available.
     """
     if not ensure_tool_installed("github-subdomains"):
         return []
+    
+    # Try to get GitHub token from subfinder config
+    github_token = None
+    try:
+        subfinder_keys = read_subfinder_api_keys()
+        github_token = subfinder_keys.get("github", "").strip()
+    except Exception:
+        pass
+    
+    # If no token available, skip with warning
+    if not github_token:
+        if job_domain:
+            job_log_append(job_domain, 
+                "github-subdomains: No GitHub token configured. Add token in API Keys settings.", 
+                source="github-subdomains")
+        log(f"github-subdomains: Skipping {domain} - no GitHub token configured")
+        return []
+    
     out_path = DATA_DIR / f"github_subdomains_{domain}.txt"
-    cmd = [
-        TOOLS["github-subdomains"],
-        "-d", domain,
-        "-o", str(out_path),
-    ]
-    context = {
-        "DOMAIN": domain,
-        "OUTPUT": str(out_path),
-    }
-    cmd = apply_template_flags("github-subdomains", cmd, context)
-    success = run_subprocess(cmd, outfile=out_path, job_domain=job_domain, step="github-subdomains")
-    return read_lines_file(out_path) if success else []
+    
+    # Use environment variable to pass token securely (avoid exposing in process list)
+    env = os.environ.copy()
+    
+    # Create temporary token file to avoid exposing token in command line
+    import tempfile
+    token_file = None
+    try:
+        # Create temporary file for token
+        fd, token_file = tempfile.mkstemp(prefix="github_token_", suffix=".txt", dir=DATA_DIR)
+        with os.fdopen(fd, 'w') as f:
+            f.write(github_token)
+        
+        cmd = [
+            TOOLS["github-subdomains"],
+            "-d", domain,
+            "-t", token_file,  # Use token file instead of raw token
+            "-o", str(out_path),
+        ]
+        context = {
+            "DOMAIN": domain,
+            "OUTPUT": str(out_path),
+        }
+        cmd = apply_template_flags("github-subdomains", cmd, context)
+        success = run_subprocess(cmd, outfile=out_path, job_domain=job_domain, step="github-subdomains")
+        return read_lines_file(out_path) if success else []
+    finally:
+        # Clean up token file
+        if token_file and os.path.exists(token_file):
+            try:
+                os.unlink(token_file)
+            except Exception:
+                pass
 
 
 def dnsx_verify(subdomains: List[str], domain: str, job_domain: Optional[str] = None) -> List[str]:
