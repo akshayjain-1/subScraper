@@ -2116,7 +2116,7 @@ def save_config(cfg: Dict[str, Any]) -> None:
     ensure_dirs()
     
     try:
-        db = get_db()
+        db = get_db()  # get_db() uses DB_LOCK internally
         cursor = db.cursor()
         now = datetime.now(timezone.utc).isoformat()
         
@@ -2129,6 +2129,7 @@ def save_config(cfg: Dict[str, Any]) -> None:
             db.isolation_level = ''
             
             # Now start an explicit transaction with IMMEDIATE lock
+            # This provides exclusive write access and prevents concurrent modifications
             cursor.execute("BEGIN IMMEDIATE")
             try:
                 for key, value in cfg.items():
@@ -2152,6 +2153,8 @@ def save_config(cfg: Dict[str, Any]) -> None:
         with CONFIG_LOCK:
             CONFIG.clear()
             CONFIG.update(cfg)
+        
+        # Apply concurrency limits
         apply_concurrency_limits(cfg)
     except Exception as e:
         log(f"Failed to save configuration: {e}")
