@@ -329,6 +329,123 @@ curl http://127.0.0.1:8342/api/system-resources | jq
 
 ---
 
+## 12. Per-Tool Concurrency Settings & Backlog Queues
+
+### What It Does
+Each reconnaissance tool now has its own configurable concurrency limit and backlog queue. When a tool reaches capacity, work items queue up for that specific tool instead of blocking the entire job. This allows jobs to proceed with other tools while waiting for busy tools to become available.
+
+### Key Features
+
+#### Comprehensive Tool Coverage
+All 16 reconnaissance tools now have individual concurrency settings:
+
+**Subdomain Enumeration Tools:**
+- Amass, Subfinder, Assetfinder, Findomain, Sublist3r, Crt.sh, GitHub-Subdomains
+
+**DNS & HTTP Tools:**
+- DNSx, HTTPx, FFUF
+
+**URL Discovery Tools:**
+- Waybackurls, GAU
+
+**Scanning & Analysis Tools:**
+- Nmap, Nuclei, Nikto, Gowitness (Screenshots)
+
+#### Per-Tool Backlog Queues
+- Each tool has an independent queue for pending work
+- Background worker thread processes queue as capacity becomes available
+- Jobs don't block waiting for busy tools - they continue with other tools
+- Queue status visible in real-time in the Workers section
+
+### How to Use
+
+#### Configure Tool Concurrency Limits
+
+1. Navigate to **Settings** → **Concurrency** tab
+2. Scroll to "Per-Tool Parallel Slots" section
+3. Set the desired concurrency limit for each tool (minimum: 1)
+4. Click "Save Settings"
+5. Limits are applied immediately to all running and future jobs
+
+**Example Configuration:**
+```
+Amass: 1 (heavy resource usage, run one at a time)
+Subfinder: 3 (lighter tool, can run multiple)
+Nuclei: 2 (moderate resource usage)
+HTTPx: 5 (lightweight, high parallelism)
+```
+
+#### Monitor Queue Status
+
+1. Navigate to the **Workers** section
+2. View each tool's status card showing:
+   - Active slots in use (e.g., "2/3")
+   - Progress bar showing capacity utilization
+   - Queue count: "📋 5 queued" (when items are waiting)
+
+### How It Works
+
+1. **Work Submission**: When a job needs to run a tool, it submits work to the tool's gate
+2. **Capacity Check**: If the tool has available capacity, work starts immediately
+3. **Queue on Full**: If at capacity, work queues in the tool-specific backlog
+4. **Background Processing**: A worker thread processes the queue as slots free up
+5. **Non-Blocking**: Jobs continue with other tools while waiting for busy tools
+
+### Benefits
+
+- **No More Deadlocks**: Jobs never wait indefinitely for a single busy tool
+- **Better Resource Utilization**: Light tools can run in parallel while heavy tools queue
+- **Improved Throughput**: Multiple jobs share tool capacity fairly
+- **Visibility**: Real-time queue status shows what's waiting
+- **Flexible Tuning**: Adjust each tool independently based on resource usage
+
+### API Usage
+
+**Get Current Tool Status:**
+```bash
+curl http://127.0.0.1:8342/api/state | jq '.workers.tools'
+```
+
+**Response:**
+```json
+{
+  "amass": {
+    "limit": 1,
+    "active": 1,
+    "queued": 2
+  },
+  "subfinder": {
+    "limit": 3,
+    "active": 2,
+    "queued": 0
+  }
+}
+```
+
+### Best Practices
+
+1. **Heavy Tools (amass, nmap, nikto)**: Keep at 1-2 for resource-intensive operations
+2. **Medium Tools (nuclei, ffuf, gowitness)**: Set to 2-4 based on system capacity
+3. **Light Tools (subfinder, assetfinder, httpx)**: Can run 3-10+ in parallel
+4. **Monitor First**: Run a test job and watch resource usage before increasing limits
+5. **Balance Load**: If one tool queues heavily, consider increasing its limit
+
+### Troubleshooting
+
+**Issue**: Tools showing large queue counts
+- **Cause**: Concurrency limit is too low for the workload
+- **Solution**: Increase the tool's parallel slots in Settings
+
+**Issue**: System resources maxed out
+- **Cause**: Too many tools running in parallel
+- **Solution**: Decrease tool concurrency limits or max_running_jobs
+
+**Issue**: Jobs completing slowly
+- **Cause**: Bottleneck on a specific tool
+- **Solution**: Check Workers section to identify which tool has the most queued items, then increase its limit
+
+---
+
 ## Browser Compatibility
 
 All features work in modern browsers:

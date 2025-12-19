@@ -114,12 +114,13 @@ Inside the UI you can:
 
 1. Launch new jobs from the Overview module.
 2. Pause/resume running jobs in the Jobs module.
-3. Inspect tool/worker utilization in Workers.
+3. Inspect tool/worker utilization in Workers – **now with per-tool queue status**.
 4. **Monitor system resources in the System Resources tab** – View real-time CPU, memory, disk, and network usage with automatic warnings.
 5. View system logs with filtering and sorting in the Logs tab (filter by source, level, or search text).
 6. Drill into the revamped Reports page to see per-program progress, completed vs pending steps, collapsible per-tool sections, paginated tables, and the max-severity badge.
 7. Configure monitoring feeds under the Monitors tab – each monitor shows polling health, last fetch, number of pending entries, and per-entry dispatch status.
-8. Export raw data or tweak defaults in Settings (concurrency, wordlists, skip flags, wildcard TLD expansion, etc.).
+8. **Configure per-tool concurrency limits in Settings** – Each of the 16 tools has independent concurrency and queue settings.
+9. Export raw data or tweak defaults in Settings (concurrency, wordlists, skip flags, wildcard TLD expansion, etc.).
 
 All output (jsonl history, tool artifacts, screenshots, monitor metadata) lives under `recon_data/`, making it easy to version, sync, or analyze with other tooling.
 
