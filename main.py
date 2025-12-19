@@ -2130,7 +2130,7 @@ def save_config(cfg: Dict[str, Any]) -> None:
                 )
             
             db.commit()
-        except (sqlite3.Error, sqlite3.DatabaseError) as e:
+        except sqlite3.Error as e:
             db.rollback()
             log(f"Database error saving config: {e}")
             raise
@@ -2144,9 +2144,6 @@ def save_config(cfg: Dict[str, Any]) -> None:
             CONFIG.clear()
             CONFIG.update(cfg)
         apply_concurrency_limits(cfg)
-    except (sqlite3.Error, sqlite3.DatabaseError) as e:
-        log(f"Failed to save configuration to database: {e}")
-        raise
     except Exception as e:
         log(f"Failed to save configuration: {e}")
         raise
