@@ -6726,6 +6726,7 @@ button:hover { background:#1d4ed8; }
   </div>
 </div>
 <script>
+console.log('[DEBUG] Script loading started');
 const navLinks = document.querySelectorAll('.nav-link');
 const viewSections = document.querySelectorAll('.module');
 const SEVERITY_SCALE = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'NONE'];
@@ -6834,6 +6835,7 @@ const createBackupBtn = document.getElementById('create-backup-btn');
 const backupList = document.getElementById('backup-list');
 const settingsStatus = document.getElementById('settings-status');
 const settingsSummary = document.getElementById('settings-summary');
+console.log('[DEBUG] All DOM elements retrieved, settingsForm:', settingsForm ? 'found' : 'NULL');
 const templateInputs = {
   amass: document.getElementById('template-amass'),
   subfinder: document.getElementById('template-subfinder'),
@@ -9892,6 +9894,7 @@ attachSubdomainFilters = function(detailEl) {
   }
 };
 
+console.log('[DEBUG] Script execution complete, starting event handlers and fetch');
 renderWorkflowDiagram();
 fetchState();
 setInterval(fetchState, POLL_INTERVAL);
