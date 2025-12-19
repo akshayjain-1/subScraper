@@ -124,6 +124,20 @@ class ToolGate:
         self._count = 0
         self._cond = threading.Condition()
 
+    def _trigger_scheduling(self, context: str) -> None:
+        """
+        Notify the scheduler that a tool slot may be available.
+        This allows queued jobs to start immediately when resources free up.
+        """
+        # Using globals() to avoid forward reference issues
+        scheduler_func = globals().get('schedule_jobs')
+        if scheduler_func and callable(scheduler_func):
+            try:
+                scheduler_func()
+            except Exception as e:
+                # Don't let scheduling errors break gate operations
+                log(f"Warning: Error during job scheduling after {context}: {e}")
+
     def acquire(self) -> None:
         with self._cond:
             while self._count >= self._limit:
@@ -136,27 +150,14 @@ class ToolGate:
                 self._count -= 1
             self._cond.notify_all()
         # Notify scheduler that a tool slot is now available
-        # This allows queued jobs to start if there are free job slots
-        # Using globals() to avoid forward reference issues
-        scheduler_func = globals().get('schedule_jobs')
-        if scheduler_func and callable(scheduler_func):
-            try:
-                scheduler_func()
-            except Exception as e:
-                # Don't let scheduling errors break the release
-                log(f"Warning: Error during job scheduling after tool release: {e}")
+        self._trigger_scheduling("tool release")
 
     def update_limit(self, limit: int) -> None:
         with self._cond:
             self._limit = max(1, int(limit))
             self._cond.notify_all()
         # Check if we can schedule more jobs with the new limit
-        scheduler_func = globals().get('schedule_jobs')
-        if scheduler_func and callable(scheduler_func):
-            try:
-                scheduler_func()
-            except Exception as e:
-                log(f"Warning: Error during job scheduling after limit update: {e}")
+        self._trigger_scheduling("limit update")
 
     def snapshot(self) -> Dict[str, int]:
         with self._cond:
