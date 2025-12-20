@@ -4393,7 +4393,11 @@ def run_downstream_pipeline(
         update_step("waybackurls", status="skipped", message="waybackurls already completed for this target.", progress=0)
     
     # ---------- gau (Get All URLs) ----------
-    if not flags.get("gau_done") and config.get("enable_gau", True):
+    if is_tool_disabled("gau", config):
+        flags["gau_done"] = True
+        save_state(state)
+        update_step("gau", status="skipped", message="gau disabled (tool skipped).", progress=0)
+    elif not flags.get("gau_done") and config.get("enable_gau", True):
         log(f"=== gau URL discovery for {domain} ===")
         update_step("gau", status="running", message="Discovering URLs from multiple sources", progress=50)
         if job_domain:
@@ -4420,7 +4424,13 @@ def run_downstream_pipeline(
         update_step("gau", status="skipped", message="gau already completed for this target.", progress=0)
 
     # ---------- screenshots ----------
-    if not config.get("enable_screenshots", True):
+    if is_tool_disabled("gowitness", config):
+        state = load_state()
+        flags = ensure_target_state(state, domain)["flags"]
+        update_step("screenshots", status="skipped", message="Screenshots disabled (tool skipped).", progress=0)
+        flags["screenshots_done"] = True
+        save_state(state)
+    elif not config.get("enable_screenshots", True):
         state = load_state()
         flags = ensure_target_state(state, domain)["flags"]
         update_step("screenshots", status="skipped", message="Screenshots disabled in settings.", progress=0)
@@ -4534,34 +4544,34 @@ def run_downstream_pipeline(
             if not new_hosts:
                 if enumerators_done_event.is_set():
                     flags["nuclei_done"] = True
-                save_state(state)
-                update_step("nuclei", status="completed", message="nuclei scan finished.", progress=100)
-                break
-            job_sleep(job_domain, 5)
-            continue
-        update_step("nuclei", status="running", message=f"nuclei scanning {len(new_hosts)} pending hosts", progress=40)
-        batch_file = write_subdomains_file(domain, new_hosts, suffix="_nuclei_batch")
-        if job_domain:
-            job_log_append(job_domain, "Waiting for nuclei slot...", "scheduler")
-        with TOOL_GATES["nuclei"]:
+                    save_state(state)
+                    update_step("nuclei", status="completed", message="nuclei scan finished.", progress=100)
+                    break
+                job_sleep(job_domain, 5)
+                continue
+            update_step("nuclei", status="running", message=f"nuclei scanning {len(new_hosts)} pending hosts", progress=40)
+            batch_file = write_subdomains_file(domain, new_hosts, suffix="_nuclei_batch")
             if job_domain:
-                job_log_append(job_domain, "nuclei slot acquired.", "scheduler")
-            nuclei_json = nuclei_scan(batch_file, domain, config=config, job_domain=job_domain)
-        try:
-            batch_file.unlink()
-        except FileNotFoundError:
-            pass
-        except Exception:
-            pass
-        if not nuclei_json:
-            job_log_append(job_domain, "nuclei batch failed.", "nuclei")
-            update_step("nuclei", status="error", message="nuclei batch failed. Check logs for details.", progress=100)
-            break
-        enrich_state_with_nuclei(state, domain, nuclei_json)
-        mark_hosts_scanned(state, domain, new_hosts, "nuclei")
-        nuclei_processed.update(new_hosts)
-        save_state(state)
-        job_log_append(job_domain, f"nuclei processed {len(new_hosts)} hosts.", "nuclei")
+                job_log_append(job_domain, "Waiting for nuclei slot...", "scheduler")
+            with TOOL_GATES["nuclei"]:
+                if job_domain:
+                    job_log_append(job_domain, "nuclei slot acquired.", "scheduler")
+                nuclei_json = nuclei_scan(batch_file, domain, config=config, job_domain=job_domain)
+            try:
+                batch_file.unlink()
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
+            if not nuclei_json:
+                job_log_append(job_domain, "nuclei batch failed.", "nuclei")
+                update_step("nuclei", status="error", message="nuclei batch failed. Check logs for details.", progress=100)
+                break
+            enrich_state_with_nuclei(state, domain, nuclei_json)
+            mark_hosts_scanned(state, domain, new_hosts, "nuclei")
+            nuclei_processed.update(new_hosts)
+            save_state(state)
+            job_log_append(job_domain, f"nuclei processed {len(new_hosts)} hosts.", "nuclei")
 
     state = load_state()
     flags = ensure_target_state(state, domain)["flags"]
