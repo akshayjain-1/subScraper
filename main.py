@@ -13115,7 +13115,11 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
                 if not comment_id:
                     self._send_json({"success": False, "message": "Comment ID is required for delete"}, status=HTTPStatus.BAD_REQUEST)
                     return
+                original_count = len(comments)
                 comments = [c for c in comments if c.get("id") != comment_id]
+                if len(comments) == original_count:
+                    self._send_json({"success": False, "message": "Comment not found"}, status=HTTPStatus.NOT_FOUND)
+                    return
                 sub_data["comments"] = comments
                 save_state(state)
                 self._send_json({"success": True, "message": "Comment deleted"})
@@ -13158,7 +13162,11 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
                 if not comment_id:
                     self._send_json({"success": False, "message": "Comment ID is required for delete"}, status=HTTPStatus.BAD_REQUEST)
                     return
+                original_count = len(comments)
                 comments = [c for c in comments if c.get("id") != comment_id]
+                if len(comments) == original_count:
+                    self._send_json({"success": False, "message": "Comment not found"}, status=HTTPStatus.NOT_FOUND)
+                    return
                 target["comments"] = comments
                 save_state(state)
                 self._send_json({"success": True, "message": "Comment deleted"})
