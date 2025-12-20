@@ -6184,6 +6184,11 @@ button:hover { background:#1d4ed8; }
           <p class="muted">Visual representation of how data flows through the reconnaissance tools</p>
           <div id="workflow-diagram" style="margin-top: 20px;"></div>
         </div>
+        <div class="card" style="margin: 24px 0;">
+          <h3>Recent Targets</h3>
+          <p class="muted">Quick overview of all tracked domains</p>
+          <div id="overview-targets-list"></div>
+        </div>
       </div>
     </section>
 
@@ -7055,6 +7060,7 @@ const statActive = document.getElementById('stat-active');
 const statQueued = document.getElementById('stat-queued');
 const statTargets = document.getElementById('stat-targets');
 const statSubs = document.getElementById('stat-subdomains');
+const overviewTargetsList = document.getElementById('overview-targets-list');
 let launchFormDirty = false;
 let settingsFormDirty = false;
 let monitorsData = [];
@@ -7430,6 +7436,119 @@ function renderQueue(queue) {
     `;
   }).join('');
   queueList.innerHTML = cards;
+}
+
+function renderOverviewTargets(targets) {
+  const entries = Object.entries(targets || {});
+  if (!entries.length || !overviewTargetsList) {
+    if (overviewTargetsList) {
+      overviewTargetsList.innerHTML = '<div class="section-placeholder">No reconnaissance data yet.</div>';
+    }
+    return;
+  }
+  
+  // Get filter values from localStorage or defaults
+  const overviewFilters = getOverviewFilters();
+  
+  // Apply filters
+  const filteredEntries = entries.filter(([domain, info]) => {
+    // Domain search filter
+    if (overviewFilters.domainSearch && !domain.toLowerCase().includes(overviewFilters.domainSearch.toLowerCase())) {
+      return false;
+    }
+    
+    // Status filter (pending/complete)
+    if (overviewFilters.status !== 'all') {
+      const isPending = info && info.pending;
+      if (overviewFilters.status === 'pending' && !isPending) return false;
+      if (overviewFilters.status === 'complete' && isPending) return false;
+    }
+    
+    return true;
+  });
+  
+  filteredEntries.sort((a, b) => a[0].localeCompare(b[0]));
+  
+  // Add filter controls
+  const filterControls = `
+    <div class="filter-bar" style="margin-bottom: 16px; padding: 12px; background: var(--panel); border-radius: 8px; border: 1px solid #1f2937;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+        <div>
+          <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Search Domain</label>
+          <input type="search" id="overview-domain-search" placeholder="example.com" value="${escapeHtml(overviewFilters.domainSearch || '')}" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0b152c; color: var(--text);">
+        </div>
+        <div>
+          <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Status</label>
+          <select id="overview-status-filter" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0b152c; color: var(--text);">
+            <option value="all" ${overviewFilters.status === 'all' ? 'selected' : ''}>All</option>
+            <option value="pending" ${overviewFilters.status === 'pending' ? 'selected' : ''}>Pending</option>
+            <option value="complete" ${overviewFilters.status === 'complete' ? 'selected' : ''}>Complete</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: var(--muted);">
+        Showing ${filteredEntries.length} of ${entries.length} targets
+      </div>
+    </div>
+  `;
+  
+  const tableRows = filteredEntries.map(([domain, info], idx) => {
+    const subs = (info && info.subdomains) || {};
+    const subCount = Object.keys(subs).length;
+    const isPending = info && info.pending;
+    const statusBadge = isPending 
+      ? '<span class="badge pending">Pending</span>'
+      : '<span class="badge complete">Complete</span>';
+    
+    // Count findings
+    let nucleiCount = 0;
+    let niktoCount = 0;
+    Object.values(subs).forEach(entry => {
+      nucleiCount += Array.isArray(entry.nuclei) ? entry.nuclei.length : 0;
+      niktoCount += Array.isArray(entry.nikto) ? entry.nikto.length : 0;
+    });
+    const findingsCount = nucleiCount + niktoCount;
+    
+    return `
+      <tr>
+        <td>${idx + 1}</td>
+        <td><a href="/domain/${encodeURIComponent(domain)}" class="link-btn">${escapeHtml(domain)}</a></td>
+        <td>${subCount}</td>
+        <td>${findingsCount}</td>
+        <td>${statusBadge}</td>
+      </tr>
+    `;
+  }).join('');
+  
+  const table = `
+    <div class="table-wrapper">
+      <table class="targets-table" id="overview-targets-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Domain</th>
+            <th>Subdomains</th>
+            <th>Findings</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    <div class="table-pagination" id="overview-targets-pagination"></div>
+  `;
+  
+  overviewTargetsList.innerHTML = filterControls + table;
+  
+  // Attach filter event listeners
+  attachOverviewFilterListeners();
+  
+  // Initialize pagination
+  const tableEl = document.getElementById('overview-targets-table');
+  const pagerEl = document.getElementById('overview-targets-pagination');
+  if (tableEl && pagerEl) {
+    initPagination(tableEl, pagerEl, DEFAULT_PAGE_SIZE);
+  }
 }
 
 function renderTargets(targets) {
@@ -8664,6 +8783,53 @@ function attachTargetFilterListeners() {
   }
 }
 
+// Overview filter management
+function getOverviewFilters() {
+  try {
+    const saved = localStorage.getItem('overviewFilters');
+    return saved ? JSON.parse(saved) : {
+      domainSearch: '',
+      status: 'all'
+    };
+  } catch (e) {
+    return {
+      domainSearch: '',
+      status: 'all'
+    };
+  }
+}
+
+function saveOverviewFiltersToStorage() {
+  try {
+    const domainSearch = document.getElementById('overview-domain-search')?.value || '';
+    const status = document.getElementById('overview-status-filter')?.value || 'all';
+    
+    localStorage.setItem('overviewFilters', JSON.stringify({
+      domainSearch,
+      status
+    }));
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
+function attachOverviewFilterListeners() {
+  const domainSearch = document.getElementById('overview-domain-search');
+  const statusFilter = document.getElementById('overview-status-filter');
+  
+  const applyFilters = () => {
+    saveOverviewFiltersToStorage();
+    renderOverviewTargets(latestTargetsData);
+  };
+  
+  if (domainSearch) {
+    domainSearch.addEventListener('input', applyFilters);
+  }
+  if (statusFilter) {
+    statusFilter.addEventListener('change', applyFilters);
+  }
+}
+
 function renderReports(targets) {
   latestTargetsData = targets || {};
   
@@ -9757,6 +9923,7 @@ async function fetchState() {
     document.getElementById('last-updated').textContent = 'Last updated: ' + (data.last_updated || 'never');
     renderJobs(data.running_jobs || []);
     renderQueue(data.queued_jobs || []);
+    renderOverviewTargets(data.targets || {});
     renderTargets(data.targets || {});
     renderSettings(data.config || {}, data.tools || {});
     renderWorkers(data.workers || {});
