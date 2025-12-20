@@ -525,6 +525,7 @@ def init_database() -> None:
             data TEXT NOT NULL,
             flags TEXT,
             options TEXT,
+            comments TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -537,6 +538,8 @@ def init_database() -> None:
             domain TEXT NOT NULL,
             subdomain TEXT NOT NULL,
             data TEXT NOT NULL,
+            interesting INTEGER,
+            comments TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(domain, subdomain),
@@ -813,10 +816,56 @@ def migrate_json_to_sqlite() -> None:
     log("Migration from JSON to SQLite completed successfully!")
 
 
+def run_schema_migrations() -> None:
+    """Run schema migrations to add new columns to existing tables."""
+    db = get_db()
+    cursor = db.cursor()
+    
+    # Migration: Add interesting and comments columns to subdomains table
+    if not check_migration_done("add_subdomain_interesting_comments"):
+        log("Running migration: add_subdomain_interesting_comments")
+        try:
+            # Check if columns already exist
+            cursor.execute("PRAGMA table_info(subdomains)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            if "interesting" not in columns:
+                cursor.execute("ALTER TABLE subdomains ADD COLUMN interesting INTEGER")
+                log("  ✓ Added 'interesting' column to subdomains table")
+            
+            if "comments" not in columns:
+                cursor.execute("ALTER TABLE subdomains ADD COLUMN comments TEXT")
+                log("  ✓ Added 'comments' column to subdomains table")
+            
+            db.commit()
+            mark_migration_done("add_subdomain_interesting_comments")
+            log("✓ Migration add_subdomain_interesting_comments completed")
+        except Exception as e:
+            log(f"Error in migration add_subdomain_interesting_comments: {e}")
+    
+    # Migration: Add comments column to targets table
+    if not check_migration_done("add_target_comments"):
+        log("Running migration: add_target_comments")
+        try:
+            cursor.execute("PRAGMA table_info(targets)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            if "comments" not in columns:
+                cursor.execute("ALTER TABLE targets ADD COLUMN comments TEXT")
+                log("  ✓ Added 'comments' column to targets table")
+            
+            db.commit()
+            mark_migration_done("add_target_comments")
+            log("✓ Migration add_target_comments completed")
+        except Exception as e:
+            log(f"Error in migration add_target_comments: {e}")
+
+
 def ensure_database() -> None:
     """Ensure database is initialized and migrated."""
     init_database()
     migrate_json_to_sqlite()
+    run_schema_migrations()
 
 
 def atomic_write_json(filepath: Path, data: Dict[str, Any], indent: int = 2) -> None:
@@ -1071,6 +1120,14 @@ def is_subdomain_input(domain: str) -> bool:
     return len(parts) >= 3
 
 
+def is_tool_disabled(tool_name: str, config: Optional[Dict[str, Any]] = None) -> bool:
+    """Check if a tool is disabled in the configuration."""
+    if config is None:
+        config = get_config()
+    disabled_tools = config.get("disabled_tools", [])
+    return tool_name in disabled_tools
+
+
 def job_log_append(domain: Optional[str], text: Optional[str], source: str = "system") -> None:
     if not domain or not text:
         return
@@ -1161,6 +1218,7 @@ def default_config() -> Dict[str, Any]:
         "auto_backup_interval": 3600,
         "auto_backup_max_count": 10,
         "setup_completed": False,
+        "disabled_tools": [],
     }
 
 
@@ -2622,6 +2680,17 @@ def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str,
         if cfg.get("auto_backup_max_count", 10) != new_count:
             cfg["auto_backup_max_count"] = new_count
             changed = True
+    
+    # Handle disabled tools
+    if "disabled_tools" in values:
+        disabled_str = str(values.get("disabled_tools", "")).strip()
+        if disabled_str:
+            new_disabled = [t.strip() for t in disabled_str.split(",") if t.strip()]
+        else:
+            new_disabled = []
+        if cfg.get("disabled_tools", []) != new_disabled:
+            cfg["disabled_tools"] = new_disabled
+            changed = True
 
     if changed:
         save_config(cfg)
@@ -2667,7 +2736,7 @@ def load_state() -> Dict[str, Any]:
     cursor = db.cursor()
     
     # Load targets
-    cursor.execute("SELECT domain, data, flags, options FROM targets")
+    cursor.execute("SELECT domain, data, flags, options, comments FROM targets")
     target_rows = cursor.fetchall()
     
     targets = {}
@@ -2675,10 +2744,11 @@ def load_state() -> Dict[str, Any]:
         domain = row[0]
         flags = json.loads(row[2]) if row[2] else {}
         options = json.loads(row[3]) if row[3] else {}
+        target_comments = json.loads(row[4]) if row[4] else []
         
         # Load subdomains for this target
         cursor.execute(
-            "SELECT subdomain, data FROM subdomains WHERE domain = ?",
+            "SELECT subdomain, data, interesting, comments FROM subdomains WHERE domain = ?",
             (domain,)
         )
         subdomain_rows = cursor.fetchall()
@@ -2687,12 +2757,18 @@ def load_state() -> Dict[str, Any]:
         for sub_row in subdomain_rows:
             subdomain = sub_row[0]
             sub_data = json.loads(sub_row[1])
+            # Add interesting and comments to subdomain data
+            if sub_row[2] is not None:
+                sub_data["interesting"] = bool(sub_row[2])
+            if sub_row[3]:
+                sub_data["comments"] = json.loads(sub_row[3])
             subdomains[subdomain] = sub_data
         
         targets[domain] = {
             "subdomains": subdomains,
             "flags": flags,
             "options": options,
+            "comments": target_comments,
         }
     
     # Get last updated time from the most recent target update
@@ -2723,17 +2799,19 @@ def save_state(state: Dict[str, Any]) -> None:
             subdomains = target_data.get("subdomains", {})
             flags = target_data.get("flags", {})
             options = target_data.get("options", {})
+            target_comments = target_data.get("comments", [])
             
             # Insert or update target
             cursor.execute(
-                """INSERT INTO targets (domain, data, flags, options, created_at, updated_at) 
-                   VALUES (?, ?, ?, ?, ?, ?)
+                """INSERT INTO targets (domain, data, flags, options, comments, created_at, updated_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(domain) DO UPDATE SET 
                    data = excluded.data,
                    flags = excluded.flags,
                    options = excluded.options,
+                   comments = excluded.comments,
                    updated_at = excluded.updated_at""",
-                (domain, "{}", json.dumps(flags), json.dumps(options), now, now)
+                (domain, "{}", json.dumps(flags), json.dumps(options), json.dumps(target_comments), now, now)
             )
             
             # Delete old subdomains not in current state
@@ -2752,13 +2830,23 @@ def save_state(state: Dict[str, Any]) -> None:
             
             # Insert or update subdomains
             for subdomain, sub_data in subdomains.items():
+                # Extract interesting and comments from sub_data
+                interesting = sub_data.get("interesting")
+                interesting_val = None if interesting is None else (1 if interesting else 0)
+                comments_data = sub_data.get("comments", [])
+                
+                # Create clean sub_data without interesting/comments for data field
+                clean_sub_data = {k: v for k, v in sub_data.items() if k not in ("interesting", "comments")}
+                
                 cursor.execute(
-                    """INSERT INTO subdomains (domain, subdomain, data, created_at, updated_at) 
-                       VALUES (?, ?, ?, ?, ?)
+                    """INSERT INTO subdomains (domain, subdomain, data, interesting, comments, created_at, updated_at) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
                        ON CONFLICT(domain, subdomain) DO UPDATE SET 
                        data = excluded.data,
+                       interesting = excluded.interesting,
+                       comments = excluded.comments,
                        updated_at = excluded.updated_at""",
-                    (domain, subdomain, json.dumps(sub_data), now, now)
+                    (domain, subdomain, json.dumps(clean_sub_data), interesting_val, json.dumps(comments_data), now, now)
                 )
         
         db.commit()
@@ -4163,7 +4251,11 @@ def run_downstream_pipeline(
     flags = ensure_target_state(state, domain)["flags"]
     
     # ---------- dnsx (DNS verification) ----------
-    if not flags.get("dnsx_done") and config.get("enable_dnsx", True):
+    if is_tool_disabled("dnsx", config):
+        update_step("dnsx", status="skipped", message="dnsx disabled (tool skipped).", progress=0)
+        flags["dnsx_done"] = True
+        save_state(state)
+    elif not flags.get("dnsx_done") and config.get("enable_dnsx", True):
         # Get all discovered subdomains from state
         tgt_state = ensure_target_state(state, domain)
         all_discovered_subs = sorted(tgt_state["subdomains"].keys())
@@ -4192,7 +4284,11 @@ def run_downstream_pipeline(
         update_step("dnsx", status="skipped", message="dnsx already completed for this target.", progress=0)
 
     # ---------- ffuf ----------
-    if not flags.get("ffuf_done"):
+    if is_tool_disabled("ffuf", config):
+        update_step("ffuf", status="skipped", message="ffuf disabled (tool skipped).", progress=0)
+        flags["ffuf_done"] = True
+        save_state(state)
+    elif not flags.get("ffuf_done"):
         if not wordlist or (wordlist and not Path(wordlist).exists()):
             log("ffuf wordlist not provided or not found; skipping ffuf brute-force.")
             update_step("ffuf", status="skipped", message="Wordlist missing; ffuf skipped.", progress=0)
@@ -4214,52 +4310,63 @@ def run_downstream_pipeline(
         update_step("ffuf", status="skipped", message="ffuf already completed for this target.", progress=0)
 
     # ---------- httpx ----------
-    httpx_processed: set = set()
-    while True:
+    if is_tool_disabled("httpx", config):
         state = load_state()
-        tgt_state = ensure_target_state(state, domain)
-        flags = tgt_state["flags"]
-        submap = tgt_state["subdomains"]
-        new_hosts = [
-            host for host in sorted(submap.keys())
-            if host not in httpx_processed and not (submap.get(host) or {}).get("httpx")
-        ]
-        if not flags.get("httpx_done") and not httpx_processed:
-            log(f"=== httpx scan for {domain} ({len(submap)} hosts tracked) ===")
-        if not new_hosts:
-            if enumerators_done_event.is_set():
-                flags["httpx_done"] = True
-                save_state(state)
-                update_step("httpx", status="completed", message="httpx scan finished.", progress=100)
-                break
-            job_sleep(job_domain, 5)
-            continue
-        update_step("httpx", status="running", message=f"httpx scanning {len(new_hosts)} pending hosts", progress=40)
-        batch_file = write_subdomains_file(domain, new_hosts, suffix="_httpx_batch")
-        if job_domain:
-            job_log_append(job_domain, "Waiting for httpx slot...", "scheduler")
-        with TOOL_GATES["httpx"]:
-            if job_domain:
-                job_log_append(job_domain, "httpx slot acquired.", "scheduler")
-            httpx_json = httpx_scan(batch_file, domain, config=config, job_domain=job_domain)
-        try:
-            batch_file.unlink()
-        except FileNotFoundError:
-            pass
-        except Exception:
-            pass
-        if not httpx_json:
-            job_log_append(job_domain, "httpx batch failed.", "httpx")
-            update_step("httpx", status="error", message="httpx batch failed. Check logs for details.", progress=100)
-            break
-        enrich_state_with_httpx(state, domain, httpx_json)
-        mark_hosts_scanned(state, domain, new_hosts, "httpx")
-        httpx_processed.update(new_hosts)
+        flags = ensure_target_state(state, domain)["flags"]
+        update_step("httpx", status="skipped", message="httpx disabled (tool skipped).", progress=0)
+        flags["httpx_done"] = True
         save_state(state)
-        job_log_append(job_domain, f"httpx scanned {len(new_hosts)} hosts.", "httpx")
+    else:
+        httpx_processed: set = set()
+        while True:
+            state = load_state()
+            tgt_state = ensure_target_state(state, domain)
+            flags = tgt_state["flags"]
+            submap = tgt_state["subdomains"]
+            new_hosts = [
+                host for host in sorted(submap.keys())
+                if host not in httpx_processed and not (submap.get(host) or {}).get("httpx")
+            ]
+            if not flags.get("httpx_done") and not httpx_processed:
+                log(f"=== httpx scan for {domain} ({len(submap)} hosts tracked) ===")
+            if not new_hosts:
+                if enumerators_done_event.is_set():
+                    flags["httpx_done"] = True
+                    save_state(state)
+                    update_step("httpx", status="completed", message="httpx scan finished.", progress=100)
+                    break
+                job_sleep(job_domain, 5)
+                continue
+            update_step("httpx", status="running", message=f"httpx scanning {len(new_hosts)} pending hosts", progress=40)
+            batch_file = write_subdomains_file(domain, new_hosts, suffix="_httpx_batch")
+            if job_domain:
+                job_log_append(job_domain, "Waiting for httpx slot...", "scheduler")
+            with TOOL_GATES["httpx"]:
+                if job_domain:
+                    job_log_append(job_domain, "httpx slot acquired.", "scheduler")
+                httpx_json = httpx_scan(batch_file, domain, config=config, job_domain=job_domain)
+            try:
+                batch_file.unlink()
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
+            if not httpx_json:
+                job_log_append(job_domain, "httpx batch failed.", "httpx")
+                update_step("httpx", status="error", message="httpx batch failed. Check logs for details.", progress=100)
+                break
+            enrich_state_with_httpx(state, domain, httpx_json)
+            mark_hosts_scanned(state, domain, new_hosts, "httpx")
+            httpx_processed.update(new_hosts)
+            save_state(state)
+            job_log_append(job_domain, f"httpx scanned {len(new_hosts)} hosts.", "httpx")
     
     # ---------- waybackurls (URL discovery) ----------
-    if not flags.get("waybackurls_done") and config.get("enable_waybackurls", True):
+    if is_tool_disabled("waybackurls", config):
+        flags["waybackurls_done"] = True
+        save_state(state)
+        update_step("waybackurls", status="skipped", message="waybackurls disabled (tool skipped).", progress=0)
+    elif not flags.get("waybackurls_done") and config.get("enable_waybackurls", True):
         log(f"=== waybackurls URL discovery for {domain} ===")
         update_step("waybackurls", status="running", message="Discovering URLs from archive.org", progress=50)
         if job_domain:
@@ -4286,7 +4393,11 @@ def run_downstream_pipeline(
         update_step("waybackurls", status="skipped", message="waybackurls already completed for this target.", progress=0)
     
     # ---------- gau (Get All URLs) ----------
-    if not flags.get("gau_done") and config.get("enable_gau", True):
+    if is_tool_disabled("gau", config):
+        flags["gau_done"] = True
+        save_state(state)
+        update_step("gau", status="skipped", message="gau disabled (tool skipped).", progress=0)
+    elif not flags.get("gau_done") and config.get("enable_gau", True):
         log(f"=== gau URL discovery for {domain} ===")
         update_step("gau", status="running", message="Discovering URLs from multiple sources", progress=50)
         if job_domain:
@@ -4313,7 +4424,13 @@ def run_downstream_pipeline(
         update_step("gau", status="skipped", message="gau already completed for this target.", progress=0)
 
     # ---------- screenshots ----------
-    if not config.get("enable_screenshots", True):
+    if is_tool_disabled("gowitness", config):
+        state = load_state()
+        flags = ensure_target_state(state, domain)["flags"]
+        update_step("screenshots", status="skipped", message="Screenshots disabled (tool skipped).", progress=0)
+        flags["screenshots_done"] = True
+        save_state(state)
+    elif not config.get("enable_screenshots", True):
         state = load_state()
         flags = ensure_target_state(state, domain)["flags"]
         update_step("screenshots", status="skipped", message="Screenshots disabled in settings.", progress=0)
@@ -4351,7 +4468,13 @@ def run_downstream_pipeline(
             update_step("screenshots", status="running", message=f"Captured {len(screenshot_map)} screenshots. Waiting for new hosts…", progress=75)
 
     # ---------- nmap ----------
-    if not config.get("enable_nmap", True):
+    if is_tool_disabled("nmap", config):
+        state = load_state()
+        flags = ensure_target_state(state, domain)["flags"]
+        update_step("nmap", status="skipped", message="Nmap disabled (tool skipped).", progress=0)
+        flags["nmap_done"] = True
+        save_state(state)
+    elif not config.get("enable_nmap", True):
         state = load_state()
         flags = ensure_target_state(state, domain)["flags"]
         update_step("nmap", status="skipped", message="Nmap disabled in settings.", progress=0)
@@ -4399,59 +4522,68 @@ def run_downstream_pipeline(
             job_log_append(job_domain, f"Nmap scanned {len(new_hosts)} hosts.", "nmap")
 
     # ---------- nuclei ----------
-    nuclei_processed: set = set()
-    while True:
+    if is_tool_disabled("nuclei", config):
         state = load_state()
-        tgt_state = ensure_target_state(state, domain)
-        flags = tgt_state["flags"]
-        submap = tgt_state["subdomains"]
-        new_hosts = [
-            host for host in sorted(submap.keys())
-            if host not in nuclei_processed and not (submap.get(host) or {}).get("scans", {}).get("nuclei")
-        ]
-        if not flags.get("nuclei_done") and not nuclei_processed:
-            log(f"=== nuclei scan for {domain} ({len(submap)} hosts tracked) ===")
-        if not new_hosts:
-            if enumerators_done_event.is_set():
-                flags["nuclei_done"] = True
-                save_state(state)
-                update_step("nuclei", status="completed", message="nuclei scan finished.", progress=100)
-                break
-            job_sleep(job_domain, 5)
-            continue
-        update_step("nuclei", status="running", message=f"nuclei scanning {len(new_hosts)} pending hosts", progress=40)
-        batch_file = write_subdomains_file(domain, new_hosts, suffix="_nuclei_batch")
-        if job_domain:
-            job_log_append(job_domain, "Waiting for nuclei slot...", "scheduler")
-        with TOOL_GATES["nuclei"]:
-            if job_domain:
-                job_log_append(job_domain, "nuclei slot acquired.", "scheduler")
-            nuclei_json = nuclei_scan(batch_file, domain, config=config, job_domain=job_domain)
-        try:
-            batch_file.unlink()
-        except FileNotFoundError:
-            pass
-        except Exception:
-            pass
-        if not nuclei_json:
-            job_log_append(job_domain, "nuclei batch failed.", "nuclei")
-            update_step("nuclei", status="error", message="nuclei batch failed. Check logs for details.", progress=100)
-            break
-        enrich_state_with_nuclei(state, domain, nuclei_json)
-        mark_hosts_scanned(state, domain, new_hosts, "nuclei")
-        nuclei_processed.update(new_hosts)
+        flags = ensure_target_state(state, domain)["flags"]
+        update_step("nuclei", status="skipped", message="Nuclei disabled (tool skipped).", progress=0)
+        flags["nuclei_done"] = True
         save_state(state)
-        job_log_append(job_domain, f"nuclei processed {len(new_hosts)} hosts.", "nuclei")
+    else:
+        nuclei_processed: set = set()
+        while True:
+            state = load_state()
+            tgt_state = ensure_target_state(state, domain)
+            flags = tgt_state["flags"]
+            submap = tgt_state["subdomains"]
+            new_hosts = [
+                host for host in sorted(submap.keys())
+                if host not in nuclei_processed and not (submap.get(host) or {}).get("scans", {}).get("nuclei")
+            ]
+            if not flags.get("nuclei_done") and not nuclei_processed:
+                log(f"=== nuclei scan for {domain} ({len(submap)} hosts tracked) ===")
+            if not new_hosts:
+                if enumerators_done_event.is_set():
+                    flags["nuclei_done"] = True
+                    save_state(state)
+                    update_step("nuclei", status="completed", message="nuclei scan finished.", progress=100)
+                    break
+                job_sleep(job_domain, 5)
+                continue
+            update_step("nuclei", status="running", message=f"nuclei scanning {len(new_hosts)} pending hosts", progress=40)
+            batch_file = write_subdomains_file(domain, new_hosts, suffix="_nuclei_batch")
+            if job_domain:
+                job_log_append(job_domain, "Waiting for nuclei slot...", "scheduler")
+            with TOOL_GATES["nuclei"]:
+                if job_domain:
+                    job_log_append(job_domain, "nuclei slot acquired.", "scheduler")
+                nuclei_json = nuclei_scan(batch_file, domain, config=config, job_domain=job_domain)
+            try:
+                batch_file.unlink()
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
+            if not nuclei_json:
+                job_log_append(job_domain, "nuclei batch failed.", "nuclei")
+                update_step("nuclei", status="error", message="nuclei batch failed. Check logs for details.", progress=100)
+                break
+            enrich_state_with_nuclei(state, domain, nuclei_json)
+            mark_hosts_scanned(state, domain, new_hosts, "nuclei")
+            nuclei_processed.update(new_hosts)
+            save_state(state)
+            job_log_append(job_domain, f"nuclei processed {len(new_hosts)} hosts.", "nuclei")
 
     state = load_state()
     flags = ensure_target_state(state, domain)["flags"]
     all_subs = sorted(ensure_target_state(state, domain)["subdomains"].keys())
 
     # ---------- nikto ----------
-    nikto_processed: set = set()
-    if skip_nikto:
+    if is_tool_disabled("nikto", config):
+        update_step("nikto", status="skipped", message="Nikto disabled (tool skipped).", progress=0)
+    elif skip_nikto:
         update_step("nikto", status="skipped", message="Nikto skipped per run options.", progress=0)
     else:
+        nikto_processed: set = set()
         while True:
             state = load_state()
             tgt_state = ensure_target_state(state, domain)
@@ -5416,6 +5548,9 @@ def run_pipeline(
         enable_github_subdomains = config.get("enable_github_subdomains", True)
 
         def maybe_add_enum(step_name: str, flag_key: str, desc: str, func, enabled: bool = True):
+            if is_tool_disabled(step_name, config):
+                update_step(step_name, status="skipped", message=f"{desc} disabled (tool skipped).", progress=0)
+                return
             if not enabled:
                 update_step(step_name, status="skipped", message=f"{desc} disabled in settings.", progress=0)
                 return
@@ -5424,7 +5559,9 @@ def run_pipeline(
                 return
             enumerator_specs.append((step_name, flag_key, desc, func))
 
-        if config.get("enable_amass", True):
+        if is_tool_disabled("amass", config):
+            update_step("amass", status="skipped", message="Amass disabled (tool skipped).", progress=0)
+        elif config.get("enable_amass", True):
             maybe_add_enum(
                 "amass",
                 "amass_done",
@@ -8116,14 +8253,23 @@ function renderWorkers(workers) {
     const active = info.active || 0;
     const queued = info.queued || 0;
     
+    // Check if tool is disabled
+    const disabledTools = (latestConfig && latestConfig.disabled_tools) || [];
+    const isDisabled = disabledTools.includes(name);
+    const disabledClass = isDisabled ? ' style="opacity: 0.5; border: 2px solid #ef4444;"' : '';
+    const disabledBadge = isDisabled ? '<div class="badge" style="background: #ef4444; margin-top: 4px;">🚫 Disabled</div>' : '';
+    const toggleButton = `<button class="btn secondary small" onclick="toggleTool('${escapeHtml(name)}', ${!isDisabled})" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem;">${isDisabled ? 'Enable' : 'Disable'}</button>`;
+    
     // Handle tools with and without concurrency gates
     if (limit == null) {
       // Tool without gate - just show as available
       return `
-        <div class="worker-card">
+        <div class="worker-card"${disabledClass}>
           <h3>${escapeHtml(name)}</h3>
           <div class="metric">Available</div>
           <div class="muted">no concurrency limit</div>
+          ${disabledBadge}
+          ${toggleButton}
         </div>
       `;
     } else {
@@ -8131,17 +8277,39 @@ function renderWorkers(workers) {
       const pct = limit ? Math.min(100, Math.round(active / limit * 100)) : 0;
       const queueInfo = queued > 0 ? `<div class="muted" style="margin-top: 4px;">📋 ${queued} queued</div>` : '';
       return `
-        <div class="worker-card">
+        <div class="worker-card"${disabledClass}>
           <h3>${escapeHtml(name)}</h3>
           <div class="metric">${active}/${limit}</div>
           <div class="muted">slots in use</div>
           ${queueInfo}
+          ${disabledBadge}
+          ${toggleButton}
           <div class="worker-progress">${renderProgress(pct, active >= limit ? 'running' : 'completed')}</div>
         </div>
       `;
     }
   }).join('') || '<div class="section-placeholder">No tool data.</div>';
   workersBody.innerHTML = `<div class="worker-grid">${jobCard}${dynamicCard}${backupCard}${rateLimitCard}${toolCards}</div>`;
+}
+
+async function toggleTool(toolName, enable) {
+  if (!confirm(`${enable ? 'Enable' : 'Disable'} ${toolName}? This will affect all future jobs.`)) return;
+  
+  try {
+    const resp = await fetch('/api/tools/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: toolName, enabled: enable })
+    });
+    const result = await resp.json();
+    if (result.success) {
+      fetchState(); // Reload to show updated state
+    } else {
+      alert('Error: ' + result.message);
+    }
+  } catch (err) {
+    alert('Error toggling tool: ' + err.message);
+  }
 }
 
 function renderSystemResources(data) {
@@ -11639,6 +11807,7 @@ function renderDomainDetail(info) {{
           <tr>
             <th>#</th>
             <th>Subdomain</th>
+            <th>Status</th>
             <th>HTTP Status</th>
             <th>Title</th>
             <th>Findings</th>
@@ -11653,11 +11822,20 @@ function renderDomainDetail(info) {{
     const nuclei = entry.nuclei || [];
     const nikto = entry.nikto || [];
     const findings = nuclei.length + nikto.length;
+    const interesting = entry.interesting;
+    
+    let interestingBadge = '';
+    if (interesting === true) {{
+      interestingBadge = '<span class="badge" style="background: #10b981; color: white;">⭐ Interesting</span>';
+    }} else if (interesting === false) {{
+      interestingBadge = '<span class="badge" style="background: #ef4444; color: white;">🚫 Not Interesting</span>';
+    }}
     
     html += `
       <tr>
         <td>${{idx + 1}}</td>
         <td><a href="/subdomain/${{encodeURIComponent(domain)}}/${{encodeURIComponent(sub)}}" class="link">${{escapeHtml(sub)}}</a></td>
+        <td>${{interestingBadge}}</td>
         <td>${{httpx.status_code || '—'}}</td>
         <td>${{escapeHtml(httpx.title || '—')}}</td>
         <td>${{findings > 0 ? findings + ' findings' : '—'}}</td>
@@ -11866,8 +12044,24 @@ function renderSubdomainDetail(info, history) {{
   const screenshot = info.screenshot || {{}};
   const nuclei = info.nuclei || [];
   const nikto = info.nikto || [];
+  const nmap = info.nmap || {{}};
+  const interesting = info.interesting;
+  const comments = info.comments || [];
   
   let html = '';
+  
+  // Marking and action buttons
+  html += `
+    <div class="section">
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+        <button class="btn" onclick="markSubdomain(true)" style="background: #10b981;">Mark as Interesting</button>
+        <button class="btn" onclick="markSubdomain(false)" style="background: #ef4444;">Mark as Not Interesting</button>
+        <button class="btn secondary" onclick="markSubdomain(null)">Clear Mark</button>
+        ${{interesting === true ? '<span class="badge" style="background: #10b981; color: white; margin-left: 8px;">⭐ Interesting</span>' : ''}}
+        ${{interesting === false ? '<span class="badge" style="background: #ef4444; color: white; margin-left: 8px;">🚫 Not Interesting</span>' : ''}}
+      </div>
+    </div>
+  `;
   
   // Metadata section
   html += `
@@ -11915,6 +12109,39 @@ function renderSubdomainDetail(info, history) {{
       ` : '<p class="muted">No screenshot available</p>'}}
     </div>
   `;
+  
+  // Nmap section
+  html += `<div class="section"><h2>Nmap Scan Results</h2>`;
+  if (nmap && nmap.ports && nmap.ports.length) {{
+    html += `
+      <table>
+        <thead>
+          <tr>
+            <th>Port</th>
+            <th>Protocol</th>
+            <th>State</th>
+            <th>Service</th>
+            <th>Version</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${{nmap.ports.map(port => `
+            <tr>
+              <td>${{escapeHtml(String(port.port || '—'))}}</td>
+              <td>${{escapeHtml(port.protocol || '—')}}</td>
+              <td><span class="badge" style="background: ${{port.state === 'open' ? '#10b981' : '#64748b'}}">${{escapeHtml(port.state || '—')}}</span></td>
+              <td>${{escapeHtml(port.service || '—')}}</td>
+              <td>${{escapeHtml(port.version || '—')}}</td>
+            </tr>
+          `).join('')}}
+        </tbody>
+      </table>
+      ${{nmap.scan_time ? `<p class="muted" style="margin-top: 12px;">Scanned ${{fmtTime(nmap.scan_time)}}</p>` : ''}}
+    `;
+  }} else {{
+    html += '<p class="muted">No Nmap scan data available</p>';
+  }}
+  html += '</div>';
   
   // Nuclei section
   html += `<div class="section"><h2>Nuclei Findings (${{nuclei.length}})</h2>`;
@@ -11985,7 +12212,90 @@ function renderSubdomainDetail(info, history) {{
   }}
   html += '</div>';
   
+  // Comments section
+  html += `
+    <div class="section">
+      <h2>Comments (${{comments.length}})</h2>
+      <div style="margin-bottom: 16px;">
+        <textarea id="comment-input" placeholder="Add a comment..." style="width: 100%; min-height: 80px; padding: 8px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 4px; font-family: inherit;"></textarea>
+        <button class="btn" onclick="addComment()" style="margin-top: 8px;">Add Comment</button>
+      </div>
+      <div id="comments-list">
+        ${{comments.length ? comments.map(c => `
+          <div style="background: #0f172a; padding: 12px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #334155;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+              <span class="muted" style="font-size: 0.875rem;">${{fmtTime(c.timestamp)}}</span>
+              <button class="btn secondary small" onclick="deleteComment('${{escapeHtml(c.id)}}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+            </div>
+            <div>${{escapeHtml(c.text)}}</div>
+          </div>
+        `).join('') : '<p class="muted">No comments yet</p>'}}
+      </div>
+    </div>
+  `;
+  
   document.getElementById('content').innerHTML = html;
+}}
+
+async function markSubdomain(interesting) {{
+  try {{
+    const resp = await fetch('/api/subdomain/mark', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ domain, subdomain, interesting }})
+    }});
+    const result = await resp.json();
+    if (result.success) {{
+      loadSubdomainDetail(); // Reload to show updated state
+    }} else {{
+      alert('Error: ' + result.message);
+    }}
+  }} catch (err) {{
+    alert('Error marking subdomain: ' + err.message);
+  }}
+}}
+
+async function addComment() {{
+  const input = document.getElementById('comment-input');
+  const comment = input.value.trim();
+  if (!comment) return;
+  
+  try {{
+    const resp = await fetch('/api/subdomain/comment', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ domain, subdomain, comment, action: 'add' }})
+    }});
+    const result = await resp.json();
+    if (result.success) {{
+      input.value = '';
+      loadSubdomainDetail(); // Reload to show new comment
+    }} else {{
+      alert('Error: ' + result.message);
+    }}
+  }} catch (err) {{
+    alert('Error adding comment: ' + err.message);
+  }}
+}}
+
+async function deleteComment(commentId) {{
+  if (!confirm('Delete this comment?')) return;
+  
+  try {{
+    const resp = await fetch('/api/subdomain/comment', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ domain, subdomain, comment_id: commentId, action: 'delete' }})
+    }});
+    const result = await resp.json();
+    if (result.success) {{
+      loadSubdomainDetail(); // Reload to show updated list
+    }} else {{
+      alert('Error: ' + result.message);
+    }}
+  }} catch (err) {{
+    alert('Error deleting comment: ' + err.message);
+  }}
 }}
 
 loadSubdomainDetail();
@@ -12618,6 +12928,10 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             "/api/backup/create",
             "/api/backup/restore",
             "/api/backup/delete",
+            "/api/subdomain/mark",
+            "/api/subdomain/comment",
+            "/api/target/comment",
+            "/api/tools/toggle",
         }
         if self.path not in allowed:
             self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
@@ -12736,6 +13050,155 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             success, message = save_all_api_keys(amass_keys, subfinder_keys)
             status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
             self._send_json({"success": success, "message": message}, status=status)
+            return
+
+        if self.path == "/api/subdomain/mark":
+            domain = payload.get("domain", "").strip().lower()
+            subdomain = payload.get("subdomain", "").strip().lower()
+            interesting = payload.get("interesting")  # Can be true, false, or null
+            
+            if not domain or not subdomain:
+                self._send_json({"success": False, "message": "Domain and subdomain are required"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            state = load_state()
+            target = state.get("targets", {}).get(domain)
+            if not target or subdomain not in target.get("subdomains", {}):
+                self._send_json({"success": False, "message": "Subdomain not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            
+            # Update the interesting flag
+            sub_data = target["subdomains"][subdomain]
+            if interesting is None:
+                sub_data.pop("interesting", None)
+            else:
+                sub_data["interesting"] = bool(interesting)
+            
+            save_state(state)
+            self._send_json({"success": True, "message": "Subdomain marked successfully"})
+            return
+
+        if self.path == "/api/subdomain/comment":
+            domain = payload.get("domain", "").strip().lower()
+            subdomain = payload.get("subdomain", "").strip().lower()
+            comment_text = payload.get("comment", "").strip()
+            action = payload.get("action", "add")  # add or delete
+            comment_id = payload.get("comment_id")
+            
+            if not domain or not subdomain:
+                self._send_json({"success": False, "message": "Domain and subdomain are required"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            state = load_state()
+            target = state.get("targets", {}).get(domain)
+            if not target or subdomain not in target.get("subdomains", {}):
+                self._send_json({"success": False, "message": "Subdomain not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            
+            sub_data = target["subdomains"][subdomain]
+            comments = sub_data.get("comments", [])
+            
+            if action == "add":
+                if not comment_text:
+                    self._send_json({"success": False, "message": "Comment text is required"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                new_comment = {
+                    "id": str(uuid.uuid4()),
+                    "text": comment_text,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                comments.append(new_comment)
+                sub_data["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment added", "comment": new_comment})
+            elif action == "delete":
+                if not comment_id:
+                    self._send_json({"success": False, "message": "Comment ID is required for delete"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                original_count = len(comments)
+                comments = [c for c in comments if c.get("id") != comment_id]
+                if len(comments) == original_count:
+                    self._send_json({"success": False, "message": "Comment not found"}, status=HTTPStatus.NOT_FOUND)
+                    return
+                sub_data["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment deleted"})
+            else:
+                self._send_json({"success": False, "message": "Invalid action"}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if self.path == "/api/target/comment":
+            domain = payload.get("domain", "").strip().lower()
+            comment_text = payload.get("comment", "").strip()
+            action = payload.get("action", "add")  # add or delete
+            comment_id = payload.get("comment_id")
+            
+            if not domain:
+                self._send_json({"success": False, "message": "Domain is required"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            state = load_state()
+            target = state.get("targets", {}).get(domain)
+            if not target:
+                self._send_json({"success": False, "message": "Domain not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            
+            comments = target.get("comments", [])
+            
+            if action == "add":
+                if not comment_text:
+                    self._send_json({"success": False, "message": "Comment text is required"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                new_comment = {
+                    "id": str(uuid.uuid4()),
+                    "text": comment_text,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                comments.append(new_comment)
+                target["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment added", "comment": new_comment})
+            elif action == "delete":
+                if not comment_id:
+                    self._send_json({"success": False, "message": "Comment ID is required for delete"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                original_count = len(comments)
+                comments = [c for c in comments if c.get("id") != comment_id]
+                if len(comments) == original_count:
+                    self._send_json({"success": False, "message": "Comment not found"}, status=HTTPStatus.NOT_FOUND)
+                    return
+                target["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment deleted"})
+            else:
+                self._send_json({"success": False, "message": "Invalid action"}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if self.path == "/api/tools/toggle":
+            tool_name = payload.get("tool", "").strip().lower()
+            enabled = payload.get("enabled", True)
+            
+            if tool_name not in TOOLS:
+                self._send_json({"success": False, "message": "Invalid tool name"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            config = get_config()
+            disabled_tools = config.get("disabled_tools", [])
+            
+            if enabled:
+                # Enable tool (remove from disabled list)
+                if tool_name in disabled_tools:
+                    disabled_tools.remove(tool_name)
+            else:
+                # Disable tool (add to disabled list)
+                if tool_name not in disabled_tools:
+                    disabled_tools.append(tool_name)
+            
+            # Update config
+            update_payload = {"disabled_tools": ",".join(disabled_tools)}
+            success, message, cfg = update_config_settings(update_payload)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message, "config": cfg}, status=status)
             return
 
         success, message, cfg = update_config_settings(payload)
