@@ -11892,7 +11892,7 @@ function renderSubdomainDetail(info, history) {{
       <h2>HTTP Response</h2>
       ${{Object.keys(httpx).length ? `
         <div class="grid">
-          <div class="field"><strong>URL</strong><div class="field-value"><a href="${{escapeHtml(httpx.url || '')}}" target="_blank" style="color: #60a5fa; text-decoration: none;">${{escapeHtml(httpx.url || '—')}}</a></div></div>
+          <div class="field"><strong>URL</strong><div class="field-value">${{(httpx.url && (httpx.url.startsWith('http://') || httpx.url.startsWith('https://'))) ? `<a href="${{escapeHtml(httpx.url)}}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: none;">${{escapeHtml(httpx.url)}}</a>` : escapeHtml(httpx.url || '—')}}</div></div>
           <div class="field"><strong>Status Code</strong><div class="field-value">${{httpx.status_code || '—'}}</div></div>
           <div class="field"><strong>Title</strong><div class="field-value">${{escapeHtml(httpx.title || '—')}}</div></div>
           <div class="field"><strong>Server</strong><div class="field-value">${{escapeHtml(httpx.webserver || httpx.server || '—')}}</div></div>
