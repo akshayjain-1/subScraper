@@ -525,6 +525,7 @@ def init_database() -> None:
             data TEXT NOT NULL,
             flags TEXT,
             options TEXT,
+            comments TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -537,6 +538,8 @@ def init_database() -> None:
             domain TEXT NOT NULL,
             subdomain TEXT NOT NULL,
             data TEXT NOT NULL,
+            interesting INTEGER,
+            comments TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(domain, subdomain),
@@ -813,10 +816,56 @@ def migrate_json_to_sqlite() -> None:
     log("Migration from JSON to SQLite completed successfully!")
 
 
+def run_schema_migrations() -> None:
+    """Run schema migrations to add new columns to existing tables."""
+    db = get_db()
+    cursor = db.cursor()
+    
+    # Migration: Add interesting and comments columns to subdomains table
+    if not check_migration_done("add_subdomain_interesting_comments"):
+        log("Running migration: add_subdomain_interesting_comments")
+        try:
+            # Check if columns already exist
+            cursor.execute("PRAGMA table_info(subdomains)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            if "interesting" not in columns:
+                cursor.execute("ALTER TABLE subdomains ADD COLUMN interesting INTEGER")
+                log("  ✓ Added 'interesting' column to subdomains table")
+            
+            if "comments" not in columns:
+                cursor.execute("ALTER TABLE subdomains ADD COLUMN comments TEXT")
+                log("  ✓ Added 'comments' column to subdomains table")
+            
+            db.commit()
+            mark_migration_done("add_subdomain_interesting_comments")
+            log("✓ Migration add_subdomain_interesting_comments completed")
+        except Exception as e:
+            log(f"Error in migration add_subdomain_interesting_comments: {e}")
+    
+    # Migration: Add comments column to targets table
+    if not check_migration_done("add_target_comments"):
+        log("Running migration: add_target_comments")
+        try:
+            cursor.execute("PRAGMA table_info(targets)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            if "comments" not in columns:
+                cursor.execute("ALTER TABLE targets ADD COLUMN comments TEXT")
+                log("  ✓ Added 'comments' column to targets table")
+            
+            db.commit()
+            mark_migration_done("add_target_comments")
+            log("✓ Migration add_target_comments completed")
+        except Exception as e:
+            log(f"Error in migration add_target_comments: {e}")
+
+
 def ensure_database() -> None:
     """Ensure database is initialized and migrated."""
     init_database()
     migrate_json_to_sqlite()
+    run_schema_migrations()
 
 
 def atomic_write_json(filepath: Path, data: Dict[str, Any], indent: int = 2) -> None:
@@ -1161,6 +1210,7 @@ def default_config() -> Dict[str, Any]:
         "auto_backup_interval": 3600,
         "auto_backup_max_count": 10,
         "setup_completed": False,
+        "disabled_tools": [],
     }
 
 
@@ -2622,6 +2672,17 @@ def update_config_settings(values: Dict[str, Any]) -> Tuple[bool, str, Dict[str,
         if cfg.get("auto_backup_max_count", 10) != new_count:
             cfg["auto_backup_max_count"] = new_count
             changed = True
+    
+    # Handle disabled tools
+    if "disabled_tools" in values:
+        disabled_str = str(values.get("disabled_tools", "")).strip()
+        if disabled_str:
+            new_disabled = [t.strip() for t in disabled_str.split(",") if t.strip()]
+        else:
+            new_disabled = []
+        if cfg.get("disabled_tools", []) != new_disabled:
+            cfg["disabled_tools"] = new_disabled
+            changed = True
 
     if changed:
         save_config(cfg)
@@ -2667,7 +2728,7 @@ def load_state() -> Dict[str, Any]:
     cursor = db.cursor()
     
     # Load targets
-    cursor.execute("SELECT domain, data, flags, options FROM targets")
+    cursor.execute("SELECT domain, data, flags, options, comments FROM targets")
     target_rows = cursor.fetchall()
     
     targets = {}
@@ -2675,10 +2736,11 @@ def load_state() -> Dict[str, Any]:
         domain = row[0]
         flags = json.loads(row[2]) if row[2] else {}
         options = json.loads(row[3]) if row[3] else {}
+        target_comments = json.loads(row[4]) if row[4] else []
         
         # Load subdomains for this target
         cursor.execute(
-            "SELECT subdomain, data FROM subdomains WHERE domain = ?",
+            "SELECT subdomain, data, interesting, comments FROM subdomains WHERE domain = ?",
             (domain,)
         )
         subdomain_rows = cursor.fetchall()
@@ -2687,12 +2749,18 @@ def load_state() -> Dict[str, Any]:
         for sub_row in subdomain_rows:
             subdomain = sub_row[0]
             sub_data = json.loads(sub_row[1])
+            # Add interesting and comments to subdomain data
+            if sub_row[2] is not None:
+                sub_data["interesting"] = bool(sub_row[2])
+            if sub_row[3]:
+                sub_data["comments"] = json.loads(sub_row[3])
             subdomains[subdomain] = sub_data
         
         targets[domain] = {
             "subdomains": subdomains,
             "flags": flags,
             "options": options,
+            "comments": target_comments,
         }
     
     # Get last updated time from the most recent target update
@@ -2723,17 +2791,19 @@ def save_state(state: Dict[str, Any]) -> None:
             subdomains = target_data.get("subdomains", {})
             flags = target_data.get("flags", {})
             options = target_data.get("options", {})
+            target_comments = target_data.get("comments", [])
             
             # Insert or update target
             cursor.execute(
-                """INSERT INTO targets (domain, data, flags, options, created_at, updated_at) 
-                   VALUES (?, ?, ?, ?, ?, ?)
+                """INSERT INTO targets (domain, data, flags, options, comments, created_at, updated_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(domain) DO UPDATE SET 
                    data = excluded.data,
                    flags = excluded.flags,
                    options = excluded.options,
+                   comments = excluded.comments,
                    updated_at = excluded.updated_at""",
-                (domain, "{}", json.dumps(flags), json.dumps(options), now, now)
+                (domain, "{}", json.dumps(flags), json.dumps(options), json.dumps(target_comments), now, now)
             )
             
             # Delete old subdomains not in current state
@@ -2752,13 +2822,23 @@ def save_state(state: Dict[str, Any]) -> None:
             
             # Insert or update subdomains
             for subdomain, sub_data in subdomains.items():
+                # Extract interesting and comments from sub_data
+                interesting = sub_data.get("interesting")
+                interesting_val = None if interesting is None else (1 if interesting else 0)
+                comments_data = sub_data.get("comments", [])
+                
+                # Create clean sub_data without interesting/comments for data field
+                clean_sub_data = {k: v for k, v in sub_data.items() if k not in ("interesting", "comments")}
+                
                 cursor.execute(
-                    """INSERT INTO subdomains (domain, subdomain, data, created_at, updated_at) 
-                       VALUES (?, ?, ?, ?, ?)
+                    """INSERT INTO subdomains (domain, subdomain, data, interesting, comments, created_at, updated_at) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
                        ON CONFLICT(domain, subdomain) DO UPDATE SET 
                        data = excluded.data,
+                       interesting = excluded.interesting,
+                       comments = excluded.comments,
                        updated_at = excluded.updated_at""",
-                    (domain, subdomain, json.dumps(sub_data), now, now)
+                    (domain, subdomain, json.dumps(clean_sub_data), interesting_val, json.dumps(comments_data), now, now)
                 )
         
         db.commit()
@@ -12618,6 +12698,10 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             "/api/backup/create",
             "/api/backup/restore",
             "/api/backup/delete",
+            "/api/subdomain/mark",
+            "/api/subdomain/comment",
+            "/api/target/comment",
+            "/api/tools/toggle",
         }
         if self.path not in allowed:
             self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
@@ -12736,6 +12820,147 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             success, message = save_all_api_keys(amass_keys, subfinder_keys)
             status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
             self._send_json({"success": success, "message": message}, status=status)
+            return
+
+        if self.path == "/api/subdomain/mark":
+            domain = payload.get("domain", "").strip().lower()
+            subdomain = payload.get("subdomain", "").strip().lower()
+            interesting = payload.get("interesting")  # Can be true, false, or null
+            
+            if not domain or not subdomain:
+                self._send_json({"success": False, "message": "Domain and subdomain are required"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            state = load_state()
+            target = state.get("targets", {}).get(domain)
+            if not target or subdomain not in target.get("subdomains", {}):
+                self._send_json({"success": False, "message": "Subdomain not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            
+            # Update the interesting flag
+            sub_data = target["subdomains"][subdomain]
+            if interesting is None:
+                sub_data.pop("interesting", None)
+            else:
+                sub_data["interesting"] = bool(interesting)
+            
+            save_state(state)
+            self._send_json({"success": True, "message": "Subdomain marked successfully"})
+            return
+
+        if self.path == "/api/subdomain/comment":
+            domain = payload.get("domain", "").strip().lower()
+            subdomain = payload.get("subdomain", "").strip().lower()
+            comment_text = payload.get("comment", "").strip()
+            action = payload.get("action", "add")  # add or delete
+            comment_id = payload.get("comment_id")
+            
+            if not domain or not subdomain:
+                self._send_json({"success": False, "message": "Domain and subdomain are required"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            state = load_state()
+            target = state.get("targets", {}).get(domain)
+            if not target or subdomain not in target.get("subdomains", {}):
+                self._send_json({"success": False, "message": "Subdomain not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            
+            sub_data = target["subdomains"][subdomain]
+            comments = sub_data.get("comments", [])
+            
+            if action == "add":
+                if not comment_text:
+                    self._send_json({"success": False, "message": "Comment text is required"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                new_comment = {
+                    "id": str(uuid.uuid4()),
+                    "text": comment_text,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                comments.append(new_comment)
+                sub_data["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment added", "comment": new_comment})
+            elif action == "delete":
+                if not comment_id:
+                    self._send_json({"success": False, "message": "Comment ID is required for delete"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                comments = [c for c in comments if c.get("id") != comment_id]
+                sub_data["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment deleted"})
+            else:
+                self._send_json({"success": False, "message": "Invalid action"}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if self.path == "/api/target/comment":
+            domain = payload.get("domain", "").strip().lower()
+            comment_text = payload.get("comment", "").strip()
+            action = payload.get("action", "add")  # add or delete
+            comment_id = payload.get("comment_id")
+            
+            if not domain:
+                self._send_json({"success": False, "message": "Domain is required"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            state = load_state()
+            target = state.get("targets", {}).get(domain)
+            if not target:
+                self._send_json({"success": False, "message": "Domain not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            
+            comments = target.get("comments", [])
+            
+            if action == "add":
+                if not comment_text:
+                    self._send_json({"success": False, "message": "Comment text is required"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                new_comment = {
+                    "id": str(uuid.uuid4()),
+                    "text": comment_text,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                comments.append(new_comment)
+                target["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment added", "comment": new_comment})
+            elif action == "delete":
+                if not comment_id:
+                    self._send_json({"success": False, "message": "Comment ID is required for delete"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                comments = [c for c in comments if c.get("id") != comment_id]
+                target["comments"] = comments
+                save_state(state)
+                self._send_json({"success": True, "message": "Comment deleted"})
+            else:
+                self._send_json({"success": False, "message": "Invalid action"}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if self.path == "/api/tools/toggle":
+            tool_name = payload.get("tool", "").strip().lower()
+            enabled = payload.get("enabled", True)
+            
+            if tool_name not in TOOLS:
+                self._send_json({"success": False, "message": "Invalid tool name"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            
+            config = get_config()
+            disabled_tools = config.get("disabled_tools", [])
+            
+            if enabled:
+                # Enable tool (remove from disabled list)
+                if tool_name in disabled_tools:
+                    disabled_tools.remove(tool_name)
+            else:
+                # Disable tool (add to disabled list)
+                if tool_name not in disabled_tools:
+                    disabled_tools.append(tool_name)
+            
+            # Update config
+            update_payload = {"disabled_tools": ",".join(disabled_tools)}
+            success, message, cfg = update_config_settings(update_payload)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message, "config": cfg}, status=status)
             return
 
         success, message, cfg = update_config_settings(payload)
