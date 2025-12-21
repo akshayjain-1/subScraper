@@ -5265,9 +5265,9 @@ def ffuf_bruteforce(
         return []
 
     subs = set()
-    invalid_count = 0
     try:
         data = json.loads(out_json.read_text(encoding="utf-8"))
+        invalid_count = 0
         for r in data.get("results", []):
             host = r.get("host") or r.get("url")
             if host:
@@ -5283,9 +5283,10 @@ def ffuf_bruteforce(
                     invalid_count += 1
         
         if invalid_count > 0:
-            log(f"ffuf: Filtered out {invalid_count} invalid subdomain entries")
+            msg = f"Filtered out {invalid_count} invalid subdomain entries from ffuf results"
+            log(f"ffuf: {msg}")
             if job_domain:
-                job_log_append(job_domain, f"Filtered out {invalid_count} invalid subdomain entries from ffuf results", "ffuf")
+                job_log_append(job_domain, msg, "ffuf")
     except Exception as e:
         log(f"Error parsing ffuf JSON: {e}")
     return sorted(subs)
