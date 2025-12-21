@@ -5026,14 +5026,18 @@ def run_downstream_pipeline(
         except Exception:
             pass
         if not httpx_json:
-            job_log_append(job_domain, "httpx batch failed.", "httpx")
-            update_step("httpx", status="error", message="httpx batch failed. Check logs for details.", progress=100)
-            break
-        enrich_state_with_httpx(state, domain, httpx_json)
-        mark_hosts_scanned(state, domain, new_hosts, "httpx")
-        httpx_processed.update(new_hosts)
-        save_state(state)
-        job_log_append(job_domain, f"httpx scanned {len(new_hosts)} hosts.", "httpx")
+            job_log_append(job_domain, "httpx batch failed. Continuing with pipeline.", "httpx")
+            update_step("httpx", status="error", message="httpx batch failed (timeouts or connection issues). Continuing with pipeline.", progress=100)
+            # Don't break - httpx failures (especially timeouts) are common and shouldn't stop the pipeline
+            # Mark as done so we don't retry indefinitely
+            flags["httpx_done"] = True
+            save_state(state)
+        else:
+            enrich_state_with_httpx(state, domain, httpx_json)
+            mark_hosts_scanned(state, domain, new_hosts, "httpx")
+            httpx_processed.update(new_hosts)
+            save_state(state)
+            job_log_append(job_domain, f"httpx scanned {len(new_hosts)} hosts.", "httpx")
     
     # ---------- waybackurls (URL discovery) ----------
     if not flags.get("waybackurls_done") and config.get("enable_waybackurls", True):
@@ -5286,6 +5290,12 @@ def write_subdomains_file(domain: str, subs: List[str], suffix: Optional[str] = 
 
 def httpx_scan(subs_file: Path, domain: str, config: Optional[Dict[str, Any]] = None,
                job_domain: Optional[str] = None) -> Path:
+    """
+    Run httpx HTTP probing with enhanced error handling.
+    
+    Httpx may timeout on some hosts, which is normal - this shouldn't crash the pipeline.
+    Returns the output JSON file path if successful, None otherwise.
+    """
     if not ensure_tool_installed("httpx"):
         return None
     out_json = DATA_DIR / f"httpx_{domain}.json"
@@ -5304,8 +5314,23 @@ def httpx_scan(subs_file: Path, domain: str, config: Optional[Dict[str, Any]] = 
         "OUTPUT": str(out_json),
     }
     cmd = apply_template_flags("httpx", cmd, context, config)
+    
+    # Run httpx - it may fail on individual hosts (timeouts) but should still produce output
     success = run_subprocess(cmd, job_domain=job_domain, step="httpx")
-    return out_json if success and out_json.exists() else None
+    
+    # Even if httpx returns non-zero exit code (some hosts timed out),
+    # it may have successfully probed other hosts and written partial results
+    # So check if output file exists with content, not just success flag
+    if out_json.exists() and out_json.stat().st_size > 0:
+        return out_json
+    elif success:
+        # Success but no output - probably no hosts responded
+        if job_domain:
+            job_log_append(job_domain, "httpx completed but found no responsive hosts", "httpx")
+        return None
+    else:
+        # Failed and no output
+        return None
 
 
 def _normalize_identifier(value: str) -> str:
@@ -13859,6 +13884,11 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/settings":
             self._send_json({"config": get_config()})
+            return
+        if self.path == "/api/workers":
+            # OPTIMIZATION: Workers endpoint for real-time updates (never cached)
+            # Workers dashboard needs live data, not cached state
+            self._send_json({"workers": snapshot_workers()})
             return
         if self.path == "/api/api-keys":
             self._send_json(get_all_api_keys())
