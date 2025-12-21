@@ -10,7 +10,9 @@ Recon Command Center is a single-file orchestrator for common reconnaissance pip
 - **Live dashboard** – A modern SPA served from `main.py` tracks jobs, queue, worker slots, tool availability, and detailed per-program reports.
 - **System resource monitoring** – Real-time monitoring of CPU, memory, disk, and network usage with automatic warnings when thresholds are exceeded. Helps ensure the system isn't overwhelmed.
 - **System Logs** – Dedicated logs view with advanced filtering (by source, level, text search) and sorting. Filter preferences persist between reloads.
+- **Automatic file cleanup** – Automatically removes old temporary files, scan results, and backups to keep disk usage under control. Configurable retention periods for different file types. See [CLEANUP_AND_PAGINATION.md](CLEANUP_AND_PAGINATION.md) for details.
 - **Actionable reports** – Each target gets a dedicated page with sortable/filterable tables, paginated views, per-tool sections, command history, severity badges, and a progress overview.
+- **Screenshots gallery with pagination** – Browse large collections of screenshots with pagination controls (configurable page size, top/bottom navigation). See [CLEANUP_AND_PAGINATION.md](CLEANUP_AND_PAGINATION.md) for details.
 - **Command history & exports** – Every command executed is logged; you can export JSON or CSV snapshots at any time.
 - **Monitors** – Point the UI at a newline-delimited URL (supports wildcards like `*.corp.com` or `corp.*`). The monitor polls the file, launches new jobs when entries appear, and surfaces health/status in its own tab.
 - **Concurrency controls** – Configure max running jobs and per-tool worker caps so scans behave on your box.
