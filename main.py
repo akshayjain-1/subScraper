@@ -11903,7 +11903,7 @@ def build_state_payload_summary() -> Dict[str, Any]:
         
         targets[domain] = target_data
     
-    # Load completed jobs  and merge with active targets
+    # Load completed jobs and merge with active targets
     completed_jobs = load_completed_jobs()
     for job_key, job_data in completed_jobs.items():
         domain = job_key.rsplit("_", 1)[0] if "_" in job_key else job_key
@@ -11919,8 +11919,10 @@ def build_state_payload_summary() -> Dict[str, Any]:
             subdomains = state_data.get("subdomains", {})
             
             # Create lightweight subdomain entries for completed jobs too
+            # Limit to first 100 for performance (configurable via MAX_COMPLETED_JOB_SUBDOMAINS)
+            MAX_COMPLETED_JOB_SUBDOMAINS = 100
             lightweight_subs = {}
-            for sub, sub_data in list(subdomains.items())[:100]:  # Limit to first 100 for completed jobs
+            for sub, sub_data in list(subdomains.items())[:MAX_COMPLETED_JOB_SUBDOMAINS]:
                 lightweight_subs[sub] = {
                     "sources": sub_data.get("sources", []),
                     "httpx": {
@@ -13496,7 +13498,7 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
             self.send_header("ETag", etag)
-            self.send_header("Cache-Control", "no-cache")  # Allow caching but require validation
+            self.send_header("Cache-Control", "must-revalidate")  # Require validation with origin
             self.end_headers()
             self.wfile.write(data)
             return
