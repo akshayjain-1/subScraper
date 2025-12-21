@@ -5404,6 +5404,7 @@ def capture_screenshots(
         "-f", str(target_file),
         "-P", str(dest_dir),
         "--db", str(db_path),
+        "--write-db",
         "--log-level", "error",
     ]
     context = {
