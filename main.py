@@ -8258,7 +8258,7 @@ function renderWorkers(workers) {
     const isDisabled = disabledTools.includes(name);
     const disabledClass = isDisabled ? ' style="opacity: 0.5; border: 2px solid #ef4444;"' : '';
     const disabledBadge = isDisabled ? '<div class="badge" style="background: #ef4444; margin-top: 4px;">🚫 Disabled</div>' : '';
-    const toggleButton = `<button class="btn secondary small" onclick="toggleTool('${escapeHtml(name)}', ${!isDisabled})" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem;">${isDisabled ? 'Enable' : 'Disable'}</button>`;
+    const toggleButton = `<button class="btn secondary small" onclick="toggleTool('${escapeHtml(name)}', ${isDisabled})" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem;">${isDisabled ? 'Enable' : 'Disable'}</button>`;
     
     // Handle tools with and without concurrency gates
     if (limit == null) {
