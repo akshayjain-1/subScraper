@@ -7567,8 +7567,10 @@ function renderJobs(jobs) {
   const totalJobs = sortedJobs.length;
   jobsPaginationState.totalPages = Math.max(1, Math.ceil(totalJobs / jobsPaginationState.pageSize));
   
-  // Ensure current page is within bounds
-  if (jobsPaginationState.currentPage > jobsPaginationState.totalPages) {
+  // Ensure current page is within bounds - handle edge case of 0 pages
+  if (totalJobs === 0) {
+    jobsPaginationState.currentPage = 1;
+  } else if (jobsPaginationState.currentPage > jobsPaginationState.totalPages) {
     jobsPaginationState.currentPage = jobsPaginationState.totalPages;
   }
   
@@ -7641,6 +7643,7 @@ function renderJobsPagination(totalJobs) {
 }
 
 // Handle jobs pagination clicks
+// Note: Using document-level event delegation because pagination buttons are dynamically rendered
 document.addEventListener('click', (event) => {
   const btn = event.target.closest('[data-jobs-page-action]');
   if (!btn) return;
@@ -7656,7 +7659,7 @@ document.addEventListener('click', (event) => {
     jobsPaginationState.currentPage = jobsPaginationState.totalPages;
   }
   
-  // Re-render jobs with new page
+  // Re-render jobs with new page - latestRunningJobs is already filtered/sorted from API
   renderJobs(latestRunningJobs);
 });
 
@@ -7681,8 +7684,10 @@ function renderQueue(queue) {
   const totalItems = items.length;
   queuePaginationState.totalPages = Math.max(1, Math.ceil(totalItems / queuePaginationState.pageSize));
   
-  // Ensure current page is within bounds
-  if (queuePaginationState.currentPage > queuePaginationState.totalPages) {
+  // Ensure current page is within bounds - handle edge case of 0 pages
+  if (totalItems === 0) {
+    queuePaginationState.currentPage = 1;
+  } else if (queuePaginationState.currentPage > queuePaginationState.totalPages) {
     queuePaginationState.currentPage = queuePaginationState.totalPages;
   }
   
@@ -7736,6 +7741,7 @@ function renderQueuePagination(totalItems) {
 }
 
 // Handle queue pagination clicks
+// Note: Using document-level event delegation because pagination buttons are dynamically rendered
 document.addEventListener('click', (event) => {
   const btn = event.target.closest('[data-queue-page-action]');
   if (!btn) return;
@@ -7751,7 +7757,7 @@ document.addEventListener('click', (event) => {
     queuePaginationState.currentPage = queuePaginationState.totalPages;
   }
   
-  // Re-render queue with new page
+  // Re-render queue with new page - latestQueuedJobs is already from API
   renderQueue(latestQueuedJobs);
 });
 
