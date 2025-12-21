@@ -18,6 +18,7 @@ Features:
 import argparse
 import copy
 import csv
+import hashlib
 import io
 import json
 import mimetypes
@@ -257,6 +258,15 @@ TOOL_GATES: Dict[str, ToolGate] = {
     "nuclei": ToolGate(1),
     "nikto": ToolGate(1),
 }
+
+# State payload cache for improved performance
+STATE_CACHE_LOCK = threading.Lock()
+STATE_CACHE: Dict[str, Any] = {
+    "etag": None,
+    "payload": None,
+    "last_updated": None,
+}
+
 JOB_QUEUE: deque = deque()
 MAX_RUNNING_JOBS = 1
 RUNNING_JOBS: Dict[str, Dict[str, Any]] = {}
@@ -856,6 +866,31 @@ def run_schema_migrations() -> None:
             log("✓ Migration add_target_comments completed")
         except Exception as e:
             log(f"Error in migration add_target_comments: {e}")
+    
+    # Migration: Add performance indexes for summary queries
+    if not check_migration_done("add_performance_indexes"):
+        log("Running migration: add_performance_indexes")
+        try:
+            # Index for filtering subdomains by interesting flag
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_subdomains_domain_interesting 
+                ON subdomains(domain, interesting) WHERE interesting IS NOT NULL
+            """)
+            log("  ✓ Added index on subdomains(domain, interesting)")
+            
+            # Index for targets updated_at for last_updated queries
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_targets_updated_at 
+                ON targets(updated_at DESC)
+            """)
+            log("  ✓ Added index on targets(updated_at)")
+            
+            db.commit()
+            mark_migration_done("add_performance_indexes")
+            log("✓ Migration add_performance_indexes completed")
+        except Exception as e:
+            log(f"Error in migration add_performance_indexes: {e}")
+
 
 
 def ensure_database() -> None:
@@ -3081,6 +3116,9 @@ def save_state(state: Dict[str, Any]) -> None:
                 )
         
         db.commit()
+        
+        # Invalidate state cache after successful save
+        invalidate_state_cache()
     finally:
         release_lock()
     
@@ -3088,6 +3126,7 @@ def save_state(state: Dict[str, Any]) -> None:
         generate_html_dashboard(state)
     except Exception as e:
         log(f"Error refreshing dashboard HTML: {e}")
+
 
 
 def load_completed_jobs() -> Dict[str, Dict[str, Any]]:
@@ -10492,10 +10531,37 @@ function renderSettings(config, tools) {
   }
 }
 
+
+
+// Store last ETag for caching
+let lastStateETag = null;
+
 async function fetchState() {
   try {
-    const resp = await fetch('/api/state');
+    // Build request with ETag support for caching
+    const headers = {};
+    if (lastStateETag) {
+      headers['If-None-Match'] = lastStateETag;
+    }
+    
+    const resp = await fetch('/api/state', { headers });
+    
+    // Check for 304 Not Modified - no need to update
+    if (resp.status === 304) {
+      // Data unchanged, just update timestamp
+      const now = new Date().toISOString();
+      document.getElementById('last-updated').textContent = 'Last updated: ' + now + ' (cached)';
+      return;
+    }
+    
     if (!resp.ok) throw new Error('Failed to fetch state');
+    
+    // Store new ETag for next request
+    const etag = resp.headers.get('ETag');
+    if (etag) {
+      lastStateETag = etag;
+    }
+    
     const data = await resp.json();
     latestConfig = data.config || {};
     latestRunningJobs = data.running_jobs || [];
@@ -11741,7 +11807,170 @@ def start_pipeline_job(domain: str, wordlist: Optional[str], skip_nikto: bool, i
     return True, f"{normalized} queued; it will start when a worker is free."
 
 
+def build_state_payload_summary() -> Dict[str, Any]:
+    """
+    Build a lightweight state payload with minimal subdomain data.
+    This is much faster than build_state_payload() for large datasets.
+    
+    For each target, includes lightweight subdomain entries with only:
+    - subdomain name
+    - sources
+    - httpx summary (status_code, title, webserver only)
+    - nuclei/nikto finding counts (not full details)
+    - screenshot path (not full metadata)
+    
+    This allows the dashboard to render basic views without loading full data.
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT domain, flags, options, comments FROM targets")
+    target_rows = cursor.fetchall()
+    
+    config = get_config()
+    targets = {}
+    
+    for row in target_rows:
+        domain = row[0]
+        flags = json.loads(row[1]) if row[1] else {}
+        options = json.loads(row[2]) if row[2] else {}
+        target_comments = json.loads(row[3]) if row[3] else []
+        
+        # Load subdomain data but only extract essential fields
+        cursor.execute(
+            "SELECT subdomain, data, interesting, comments FROM subdomains WHERE domain = ?",
+            (domain,)
+        )
+        subdomain_rows = cursor.fetchall()
+        
+        subdomains = {}
+        for sub_row in subdomain_rows:
+            subdomain = sub_row[0]
+            try:
+                full_data = json.loads(sub_row[1])
+                
+                # Extract only lightweight fields
+                lightweight_data = {
+                    "sources": full_data.get("sources", []),
+                }
+                
+                # Add minimal httpx data
+                if "httpx" in full_data:
+                    httpx = full_data["httpx"]
+                    lightweight_data["httpx"] = {
+                        "status_code": httpx.get("status_code"),
+                        "title": httpx.get("title", ""),
+                        "webserver": httpx.get("webserver", httpx.get("server", "")),
+                    }
+                
+                # Add nuclei/nikto counts only (not full findings)
+                nuclei = full_data.get("nuclei", [])
+                if nuclei:
+                    lightweight_data["nuclei"] = nuclei  # Keep for severity calculation
+                
+                nikto = full_data.get("nikto", [])
+                if nikto:
+                    lightweight_data["nikto"] = nikto  # Keep for counts
+                
+                # Add screenshot path only
+                if "screenshot" in full_data:
+                    screenshot = full_data["screenshot"]
+                    lightweight_data["screenshot"] = {
+                        "path": screenshot.get("path")
+                    }
+                
+                # Add interesting flag
+                if sub_row[2] is not None:
+                    lightweight_data["interesting"] = bool(sub_row[2])
+                
+                subdomains[subdomain] = lightweight_data
+                
+            except json.JSONDecodeError:
+                subdomains[subdomain] = {}
+        
+        # Build target entry
+        target_data = {
+            "subdomains": subdomains,
+            "flags": flags,
+            "options": options,
+            "comments": target_comments,
+        }
+        
+        # Calculate pending status
+        try:
+            target_data["pending"] = target_has_pending_work(target_data, config)
+        except Exception:
+            target_data["pending"] = True
+        
+        targets[domain] = target_data
+    
+    # Load completed jobs and merge with active targets
+    completed_jobs = load_completed_jobs()
+    for job_key, job_data in completed_jobs.items():
+        domain = job_key.rsplit("_", 1)[0] if "_" in job_key else job_key
+        
+        if domain in targets:
+            # Add completion timestamp to active target
+            if not targets[domain].get("completed_at"):
+                targets[domain]["completed_at"] = job_data.get("completed_at")
+        else:
+            # Domain not in active targets - create minimal entry from completed job
+            # For completed jobs not in active state, include minimal lightweight data
+            state_data = job_data.get("state", {})
+            subdomains = state_data.get("subdomains", {})
+            
+            # Create lightweight subdomain entries for completed jobs too
+            # Limit to first 100 for performance (configurable via MAX_COMPLETED_JOB_SUBDOMAINS)
+            MAX_COMPLETED_JOB_SUBDOMAINS = 100
+            lightweight_subs = {}
+            for sub, sub_data in list(subdomains.items())[:MAX_COMPLETED_JOB_SUBDOMAINS]:
+                lightweight_subs[sub] = {
+                    "sources": sub_data.get("sources", []),
+                    "httpx": {
+                        "status_code": sub_data.get("httpx", {}).get("status_code"),
+                        "title": sub_data.get("httpx", {}).get("title", ""),
+                        "webserver": sub_data.get("httpx", {}).get("webserver", ""),
+                    } if sub_data.get("httpx") else {},
+                    "nuclei": sub_data.get("nuclei", []),
+                    "nikto": sub_data.get("nikto", []),
+                    "screenshot": {
+                        "path": sub_data.get("screenshot", {}).get("path")
+                    } if sub_data.get("screenshot") else {},
+                }
+            
+            targets[domain] = {
+                "subdomains": lightweight_subs,
+                "flags": state_data.get("flags", {}),
+                "options": job_data.get("options", {}),
+                "comments": [],
+                "completed_at": job_data.get("completed_at"),
+                "pending": False,
+                "from_completed_jobs": True,
+            }
+    
+    # Get last updated time
+    cursor.execute("SELECT MAX(updated_at) FROM targets")
+    last_updated_row = cursor.fetchone()
+    last_updated = last_updated_row[0] if last_updated_row and last_updated_row[0] else None
+    
+    tool_info = {name: shutil.which(cmd) or "" for name, cmd in TOOLS.items()}
+    return {
+        "last_updated": last_updated,
+        "targets": targets,
+        "running_jobs": snapshot_running_jobs(),
+        "queued_jobs": job_queue_snapshot(),
+        "config": config,
+        "tools": tool_info,
+        "workers": snapshot_workers(),
+        "monitors": list_monitors(),
+    }
+
+
 def build_state_payload() -> Dict[str, Any]:
+    """
+    Build complete state payload with all subdomain details.
+    This is slower but includes full information.
+    Use this for exports and detail pages only.
+    """
     state = load_state()
     config = get_config()
     targets = state.get("targets", {})
@@ -11793,6 +12022,60 @@ def build_state_payload() -> Dict[str, Any]:
         "workers": snapshot_workers(),
         "monitors": list_monitors(),
     }
+
+
+
+
+def invalidate_state_cache() -> None:
+    """Invalidate the state payload cache. Call this when state changes."""
+    global STATE_CACHE
+    with STATE_CACHE_LOCK:
+        STATE_CACHE["etag"] = None
+        STATE_CACHE["payload"] = None
+        STATE_CACHE["last_updated"] = None
+
+
+def get_cached_state_payload(full: bool = False) -> Tuple[str, Dict[str, Any]]:
+    """
+    Get state payload with caching support.
+    Returns (etag, payload) tuple.
+    
+    Args:
+        full: If True, returns full payload. If False, returns summary.
+    
+    Returns:
+        Tuple of (etag_string, payload_dict)
+    """
+    global STATE_CACHE
+    
+    # Get current last_updated time from database
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT MAX(updated_at) FROM targets")
+    last_updated_row = cursor.fetchone()
+    current_last_updated = last_updated_row[0] if last_updated_row and last_updated_row[0] else None
+    
+    # Check if we have a valid cache
+    cache_key = f"{'full' if full else 'summary'}:{current_last_updated}"
+    etag = hashlib.md5(cache_key.encode()).hexdigest()
+    
+    with STATE_CACHE_LOCK:
+        if STATE_CACHE.get("etag") == etag and STATE_CACHE.get("payload") is not None:
+            # Cache hit - return cached payload
+            return etag, STATE_CACHE["payload"]
+        
+        # Cache miss - build new payload
+        if full:
+            payload = build_state_payload()
+        else:
+            payload = build_state_payload_summary()
+        
+        # Update cache
+        STATE_CACHE["etag"] = etag
+        STATE_CACHE["payload"] = payload
+        STATE_CACHE["last_updated"] = current_last_updated
+        
+        return etag, payload
 
 
 def generate_domain_detail_page(domain: str) -> str:
@@ -13191,8 +13474,33 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.BAD_REQUEST, "Invalid request")
             return
         
-        if self.path == "/api/state":
-            self._send_json(build_state_payload())
+        if self.path.startswith("/api/state"):
+            # Parse query parameters
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            full = params.get("full", ["false"])[0].lower() in ("true", "1", "yes")
+            
+            # Get cached payload with ETag
+            etag, payload = get_cached_state_payload(full=full)
+            
+            # Check If-None-Match header for conditional requests
+            client_etag = self.headers.get("If-None-Match")
+            if client_etag and client_etag == etag:
+                # Client has current version - return 304 Not Modified
+                self.send_response(HTTPStatus.NOT_MODIFIED)
+                self.send_header("ETag", etag)
+                self.end_headers()
+                return
+            
+            # Return payload with ETag header
+            data = json.dumps(payload).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "must-revalidate")  # Require validation with origin
+            self.end_headers()
+            self.wfile.write(data)
             return
         if self.path == "/api/settings":
             self._send_json({"config": get_config()})
