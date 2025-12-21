@@ -2297,6 +2297,7 @@ CLEANUP_INTERVAL = 3600
 LAST_CLEANUP_TIME = 0.0
 CLEANUP_LOCK = threading.Lock()
 CLEANUP_THREAD: Optional[threading.Thread] = None
+CLEANUP_STOP_EVENT = threading.Event()
 
 
 def cleanup_temporary_files() -> int:
@@ -2429,10 +2430,11 @@ def auto_cleanup_worker_loop() -> None:
     # Set initial cleanup time to now to avoid immediate cleanup on start
     LAST_CLEANUP_TIME = time.time()
     
-    while True:
+    while not CLEANUP_STOP_EVENT.is_set():
         try:
             if not AUTO_CLEANUP_ENABLED:
-                time.sleep(60)  # Check every minute if disabled
+                # Wait with timeout so we can respond to stop event
+                CLEANUP_STOP_EVENT.wait(timeout=60)
                 continue
             
             current_time = time.time()
@@ -2443,11 +2445,13 @@ def auto_cleanup_worker_loop() -> None:
                 stats = run_cleanup()
                 LAST_CLEANUP_TIME = current_time
             
-            # Sleep for a short interval to check again
-            time.sleep(60)
+            # Sleep with timeout so we can respond to stop event
+            CLEANUP_STOP_EVENT.wait(timeout=60)
         except Exception as exc:
             log(f"Error in auto-cleanup worker: {exc}")
-            time.sleep(60)
+            CLEANUP_STOP_EVENT.wait(timeout=60)
+    
+    log("Auto-cleanup worker stopped.")
 
 
 def start_cleanup_worker() -> None:
@@ -2459,6 +2463,9 @@ def start_cleanup_worker() -> None:
     
     if already_running:
         return
+    
+    # Clear stop event before starting
+    CLEANUP_STOP_EVENT.clear()
     
     thread = threading.Thread(target=auto_cleanup_worker_loop, name="auto-cleanup", daemon=True)
     thread.start()
@@ -2475,8 +2482,10 @@ def stop_cleanup_worker() -> None:
     
     with CLEANUP_LOCK:
         if CLEANUP_THREAD and CLEANUP_THREAD.is_alive():
+            # Signal thread to stop
+            CLEANUP_STOP_EVENT.set()
             CLEANUP_THREAD = None
-            log("Auto-cleanup worker stopped.")
+            log("Auto-cleanup worker stop signal sent.")
 
 
 def get_cleanup_status() -> Dict[str, Any]:
@@ -12983,13 +12992,13 @@ function renderPagination(totalPages, elementId) {{
     return;
   }}
   
-  const startIdx = (currentPage - 1) * screenshotsPerPage + 1;
-  const endIdx = Math.min(startIdx + screenshotsPerPage - 1, allScreenshots.length);
+  const startIdx = (currentPage - 1) * screenshotsPerPage;
+  const endIdx = Math.min(startIdx + screenshotsPerPage, allScreenshots.length);
   
   paginationEl.innerHTML = `
     <button onclick="goToPage(1)" ${{currentPage === 1 ? 'disabled' : ''}}>«</button>
     <button onclick="goToPage(${{currentPage - 1}})" ${{currentPage === 1 ? 'disabled' : ''}}>‹</button>
-    <span class="page-info">Page ${{currentPage}} of ${{totalPages}} (showing ${{startIdx}}-${{endIdx}} of ${{allScreenshots.length}})</span>
+    <span class="page-info">Page ${{currentPage}} of ${{totalPages}} (showing ${{startIdx + 1}}-${{endIdx}} of ${{allScreenshots.length}})</span>
     <button onclick="goToPage(${{currentPage + 1}})" ${{currentPage === totalPages ? 'disabled' : ''}}>›</button>
     <button onclick="goToPage(${{totalPages}})" ${{currentPage === totalPages ? 'disabled' : ''}}>»</button>
   `;
