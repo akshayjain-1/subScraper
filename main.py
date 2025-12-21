@@ -18,6 +18,7 @@ Features:
 import argparse
 import copy
 import csv
+import hashlib
 import io
 import json
 import mimetypes
@@ -257,6 +258,15 @@ TOOL_GATES: Dict[str, ToolGate] = {
     "nuclei": ToolGate(1),
     "nikto": ToolGate(1),
 }
+
+# State payload cache for improved performance
+STATE_CACHE_LOCK = threading.Lock()
+STATE_CACHE: Dict[str, Any] = {
+    "etag": None,
+    "payload": None,
+    "last_updated": None,
+}
+
 JOB_QUEUE: deque = deque()
 MAX_RUNNING_JOBS = 1
 RUNNING_JOBS: Dict[str, Dict[str, Any]] = {}
@@ -856,6 +866,31 @@ def run_schema_migrations() -> None:
             log("✓ Migration add_target_comments completed")
         except Exception as e:
             log(f"Error in migration add_target_comments: {e}")
+    
+    # Migration: Add performance indexes for summary queries
+    if not check_migration_done("add_performance_indexes"):
+        log("Running migration: add_performance_indexes")
+        try:
+            # Index for filtering subdomains by interesting flag
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_subdomains_domain_interesting 
+                ON subdomains(domain, interesting) WHERE interesting IS NOT NULL
+            """)
+            log("  ✓ Added index on subdomains(domain, interesting)")
+            
+            # Index for targets updated_at for last_updated queries
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_targets_updated_at 
+                ON targets(updated_at DESC)
+            """)
+            log("  ✓ Added index on targets(updated_at)")
+            
+            db.commit()
+            mark_migration_done("add_performance_indexes")
+            log("✓ Migration add_performance_indexes completed")
+        except Exception as e:
+            log(f"Error in migration add_performance_indexes: {e}")
+
 
 
 def ensure_database() -> None:
@@ -3081,6 +3116,9 @@ def save_state(state: Dict[str, Any]) -> None:
                 )
         
         db.commit()
+        
+        # Invalidate state cache after successful save
+        invalidate_state_cache()
     finally:
         release_lock()
     
@@ -3088,6 +3126,7 @@ def save_state(state: Dict[str, Any]) -> None:
         generate_html_dashboard(state)
     except Exception as e:
         log(f"Error refreshing dashboard HTML: {e}")
+
 
 
 def load_completed_jobs() -> Dict[str, Dict[str, Any]]:
@@ -11956,6 +11995,60 @@ def build_state_payload() -> Dict[str, Any]:
     }
 
 
+
+
+def invalidate_state_cache() -> None:
+    """Invalidate the state payload cache. Call this when state changes."""
+    global STATE_CACHE
+    with STATE_CACHE_LOCK:
+        STATE_CACHE["etag"] = None
+        STATE_CACHE["payload"] = None
+        STATE_CACHE["last_updated"] = None
+
+
+def get_cached_state_payload(full: bool = False) -> Tuple[str, Dict[str, Any]]:
+    """
+    Get state payload with caching support.
+    Returns (etag, payload) tuple.
+    
+    Args:
+        full: If True, returns full payload. If False, returns summary.
+    
+    Returns:
+        Tuple of (etag_string, payload_dict)
+    """
+    global STATE_CACHE
+    
+    # Get current last_updated time from database
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT MAX(updated_at) FROM targets")
+    last_updated_row = cursor.fetchone()
+    current_last_updated = last_updated_row[0] if last_updated_row and last_updated_row[0] else None
+    
+    # Check if we have a valid cache
+    cache_key = f"{'full' if full else 'summary'}:{current_last_updated}"
+    etag = hashlib.md5(cache_key.encode()).hexdigest()
+    
+    with STATE_CACHE_LOCK:
+        if STATE_CACHE.get("etag") == etag and STATE_CACHE.get("payload") is not None:
+            # Cache hit - return cached payload
+            return etag, STATE_CACHE["payload"]
+        
+        # Cache miss - build new payload
+        if full:
+            payload = build_state_payload()
+        else:
+            payload = build_state_payload_summary()
+        
+        # Update cache
+        STATE_CACHE["etag"] = etag
+        STATE_CACHE["payload"] = payload
+        STATE_CACHE["last_updated"] = current_last_updated
+        
+        return etag, payload
+
+
 def generate_domain_detail_page(domain: str) -> str:
     """Generate a standalone page for domain details."""
     return f"""<!DOCTYPE html>
@@ -13358,14 +13451,27 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             params = parse_qs(parsed.query)
             full = params.get("full", ["false"])[0].lower() in ("true", "1", "yes")
             
-            # Use summary by default for better performance
-            # Full data only when explicitly requested
-            if full:
-                payload = build_state_payload()
-            else:
-                payload = build_state_payload_summary()
+            # Get cached payload with ETag
+            etag, payload = get_cached_state_payload(full=full)
             
-            self._send_json(payload)
+            # Check If-None-Match header for conditional requests
+            client_etag = self.headers.get("If-None-Match")
+            if client_etag and client_etag == etag:
+                # Client has current version - return 304 Not Modified
+                self.send_response(HTTPStatus.NOT_MODIFIED)
+                self.send_header("ETag", etag)
+                self.end_headers()
+                return
+            
+            # Return payload with ETag header
+            data = json.dumps(payload).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache")  # Allow caching but require validation
+            self.end_headers()
+            self.wfile.write(data)
             return
         if self.path == "/api/settings":
             self._send_json({"config": get_config()})
