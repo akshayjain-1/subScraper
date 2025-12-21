@@ -4375,9 +4375,10 @@ def strip_ansi_codes(text: str) -> str:
     This handles common terminal color codes that tools like sublist3r add to output.
     """
     # Pattern matches ANSI escape sequences including CSI sequences
-    # \x1b is ESC, \033 is octal representation
-    # Matches patterns like [91m, [0m, [92m[-], etc.
-    ansi_escape = re.compile(r'\x1b\[[0-9;]*m|\033\[[0-9;]*m|\[\d+m')
+    # \x1b is ESC (hex), \033 is ESC (octal)
+    # Matches standard ANSI control sequences ending in A-Za-z
+    # Also matches simpler bracket sequences like [91m, [0m
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*[A-Za-z]|\033\[[0-9;]*[A-Za-z]|\[\d+m')
     return ansi_escape.sub('', text)
 
 
@@ -4408,7 +4409,7 @@ def is_valid_subdomain(text: str) -> bool:
         r'^[0-9]+\s',  # Starts with number and space (table rows)
         r'^\||^-+$|^\++$',  # Table borders
         r'^http://|^https://',  # URLs (not raw domains)
-        r'\s',  # Contains whitespace (domains don't have spaces)
+        r'[ \t\r\n\f\v]',  # Contains ASCII whitespace (domains don't have spaces)
     ]
     
     for pattern in invalid_patterns:
