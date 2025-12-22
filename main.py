@@ -5242,9 +5242,9 @@ def ffuf_bruteforce(
 
     out_json = DATA_DIR / f"ffuf_{domain}.json"
     # NOTE: user can tune -mc, -fs, etc to avoid wildcard noise.
+    # Removed -v flag to only log subdomains that match the status codes (not all attempts)
     cmd = [
         TOOLS["ffuf"],
-        "-v",
         "-u", f"http://{domain}",
         "-H", "Host: FUZZ." + domain,
         "-w", wordlist,
