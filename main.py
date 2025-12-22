@@ -6898,7 +6898,10 @@ button:hover { background:#1d4ed8; }
     <section class="module" data-view="jobs">
       <div class="module-header">
         <h2>Active Jobs</h2>
-        <button class="btn secondary small" id="resume-all-btn" style="margin-left: auto;">Resume All Paused</button>
+        <div style="display: flex; gap: 8px; margin-left: auto;">
+          <button class="btn secondary small" id="cancel-all-btn">Cancel All</button>
+          <button class="btn secondary small" id="resume-all-btn">Resume All Paused</button>
+        </div>
       </div>
       <div class="module-body">
         <div id="jobs-list">
@@ -7618,6 +7621,7 @@ settingsTabs.forEach(tab => {
 });
 
 const POLL_INTERVAL = 8000;
+const MAX_SUBDOMAINS_PREVIEW = 50; // Maximum subdomains to show in overview before "Show more"
 const launchForm = document.getElementById('launch-form');
 const launchWordlist = document.getElementById('launch-wordlist');
 const launchInterval = document.getElementById('launch-interval');
@@ -7998,15 +8002,25 @@ function renderJobControls(job) {
   return '';
 }
 
-function renderJobStep(name, info = {}) {
+function renderJobStep(name, info = {}, domain = '') {
   const status = info.status || 'pending';
   const message = info.message || '';
   const pct = info.progress !== undefined ? info.progress : (status === 'completed' ? 100 : 0);
+  
+  // Show skip button for pending/running steps (not completed, skipped, or error)
+  const canSkip = status === 'pending' || status === 'running' || status === 'queued';
+  const skipBtn = canSkip && domain ? 
+    `<button class="btn secondary small" data-skip-step="${escapeHtml(domain)}" data-step-name="${escapeHtml(name)}" style="margin-left: 8px;">Skip</button>` : 
+    '';
+  
   return `
     <div class="step-row">
       <div class="step-header">
         <span class="step-name">${escapeHtml(name.toUpperCase())}</span>
-        <span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span>
+          ${skipBtn}
+        </div>
       </div>
       <p class="muted">${escapeHtml(message)}</p>
       ${renderProgress(pct, status)}
@@ -8060,7 +8074,7 @@ function renderJobs(jobs) {
   const cards = pageJobs.map(job => {
     const progress = Math.max(0, Math.min(100, job.progress || 0));
     const steps = job.steps || {};
-    const stepsHtml = Object.keys(steps).map(step => renderJobStep(step, steps[step])).join('');
+    const stepsHtml = Object.keys(steps).map(step => renderJobStep(step, steps[step], job.domain)).join('');
     const logsHtml = renderLogEntries(job.logs || []);
     return `
       <div class="job-card">
@@ -8431,8 +8445,20 @@ function renderTargets(targets) {
     const subs = (info && info.subdomains) || {};
     const flags = (info && info.flags) || {};
     const keys = Object.keys(subs).sort();
-    subCount += keys.length;
-    const rows = keys.map((sub, idx) => {
+    
+    // Use total_subdomains from backend if available (handles truncation)
+    const totalSubdomainCount = info.total_subdomains !== undefined ? info.total_subdomains : keys.length;
+    const wasTruncatedByBackend = info.subdomains_truncated || false;
+    
+    subCount += totalSubdomainCount;
+    
+    // PERFORMANCE OPTIMIZATION: For domains with many subdomains, only render a preview in the overview
+    // This prevents browser freezing when rendering 200k+ subdomains at once
+    const hasMany = keys.length > MAX_SUBDOMAINS_PREVIEW;
+    const previewKeys = hasMany ? keys.slice(0, MAX_SUBDOMAINS_PREVIEW) : keys;
+    const hiddenCount = hasMany ? keys.length - MAX_SUBDOMAINS_PREVIEW : 0;
+    
+    const rows = previewKeys.map((sub, idx) => {
       const entry = subs[sub] || {};
       const sources = Array.isArray(entry.sources) ? entry.sources.join(', ') : '';
       const httpx = entry.httpx || {};
@@ -8455,8 +8481,9 @@ function renderTargets(targets) {
         </tr>
       `;
     }).join('');
+    
     const badges = `
-      <span class="badge">Subdomains: ${keys.length}</span>
+      <span class="badge">Subdomains: ${totalSubdomainCount}</span>
       <span class="badge">Amass: ${flags.amass_done ? '✅' : '⏳'}</span>
       <span class="badge">Subfinder: ${flags.subfinder_done ? '✅' : '⏳'}</span>
       <span class="badge">Assetfinder: ${flags.assetfinder_done ? '✅' : '⏳'}</span>
@@ -8473,9 +8500,30 @@ function renderTargets(targets) {
       <span class="badge">nuclei: ${flags.nuclei_done ? '✅' : '⏳'}</span>
       <span class="badge">nikto: ${flags.nikto_done ? '✅' : '⏳'}</span>
     `;
+    
     const tableId = `targets-table-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
     const paginationId = `targets-pagination-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
+    
+    // Show preview notice if subdomains were limited (either by backend or frontend)
+    const previewNotice = (wasTruncatedByBackend || hasMany) ? `
+      <div style="padding: 12px; margin-bottom: 8px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="color: #f59e0b;">⚠️</span>
+            <span style="color: var(--muted); font-size: 14px;">
+              ${wasTruncatedByBackend 
+                ? `Showing first ${keys.length} of ${totalSubdomainCount} subdomains for performance.`
+                : `Showing first ${MAX_SUBDOMAINS_PREVIEW} of ${totalSubdomainCount} subdomains for performance.`
+              }
+            </span>
+          </div>
+          <a href="/domain/${encodeURIComponent(domain)}" class="btn small secondary">View All ${totalSubdomainCount}</a>
+        </div>
+      </div>
+    ` : '';
+    
     const table = rows ? `
+      ${previewNotice}
       <div class="table-wrapper">
         <table class="targets-table" id="${tableId}">
           <thead>
@@ -8495,9 +8543,9 @@ function renderTargets(targets) {
       <div class="table-pagination" id="${paginationId}"></div>
     ` : '<p class="muted">No subdomains collected yet.</p>';
     
-    // Generate node map visualization
+    // Generate node map visualization (only for domains with reasonable subdomain counts)
     const nodeMapId = `node-map-${escapeHtml(domain).replace(/[^a-zA-Z0-9]/g, '-')}`;
-    const nodeMap = keys.length > 0 ? `
+    const nodeMap = totalSubdomainCount > 0 && totalSubdomainCount <= 1000 ? `
       <div style="margin: 16px 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <h4 style="margin: 0; font-size: 14px; color: #93c5fd;">Subdomain Network Map</h4>
@@ -8507,7 +8555,13 @@ function renderTargets(targets) {
           <canvas id="${nodeMapId}-canvas" width="800" height="400" style="width: 100%; height: 400px; background: #050b18; border-radius: 12px; border: 1px solid #1f2937; cursor: pointer;"></canvas>
         </div>
       </div>
-    ` : '';
+    ` : (totalSubdomainCount > 1000 ? `
+      <div style="margin: 16px 0; padding: 12px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">
+        <span style="color: var(--muted); font-size: 14px;">
+          Network map disabled for ${totalSubdomainCount} subdomains (use domain detail page for visualization).
+        </span>
+      </div>
+    ` : '');
     
     return `
       <div class="target-card" data-domain="${escapeHtml(domain)}">
@@ -10529,6 +10583,13 @@ jobsList.addEventListener('click', (event) => {
   if (resumeBtn) {
     const domain = resumeBtn.getAttribute('data-resume-job');
     handleJobControl('resume', domain, resumeBtn);
+    return;
+  }
+  const skipBtn = event.target.closest('[data-skip-step]');
+  if (skipBtn) {
+    const domain = skipBtn.getAttribute('data-skip-step');
+    const step = skipBtn.getAttribute('data-step-name');
+    handleSkipStep(domain, step, skipBtn);
   }
 });
 
@@ -10559,6 +10620,70 @@ if (resumeAllBtn) {
     }
   });
 }
+
+// Cancel All button handler
+const cancelAllBtn = document.getElementById('cancel-all-btn');
+if (cancelAllBtn) {
+  cancelAllBtn.addEventListener('click', async () => {
+    if (!confirm('Cancel all running jobs? They will be paused and can be resumed later.')) {
+      return;
+    }
+    const original = cancelAllBtn.textContent;
+    cancelAllBtn.disabled = true;
+    cancelAllBtn.textContent = 'Cancelling...';
+    try {
+      const resp = await fetch('/api/jobs/cancel-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json();
+      cancelAllBtn.textContent = data.message || 'Done';
+      if (data.success) {
+        fetchState();
+      }
+    } catch (err) {
+      cancelAllBtn.textContent = err.message || 'Failed';
+    } finally {
+      setTimeout(() => {
+        cancelAllBtn.textContent = original;
+        cancelAllBtn.disabled = false;
+      }, 2000);
+    }
+  });
+}
+
+async function handleSkipStep(domain, step, btn) {
+  if (!confirm(`Skip ${step.toUpperCase()} step for ${domain}? This will mark it as done without running.`)) {
+    return;
+  }
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Skipping...';
+  try {
+    const resp = await fetch('/api/jobs/skip-step', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain, step })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      btn.textContent = 'Skipped';
+      fetchState();
+    } else {
+      btn.textContent = 'Failed';
+      alert(data.message || 'Failed to skip step');
+    }
+  } catch (err) {
+    btn.textContent = 'Error';
+    alert(err.message || 'Failed to skip step');
+  } finally {
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
 
 document.addEventListener('click', (event) => {
   const header = event.target.closest('.collapsible-header');
@@ -11818,6 +11943,95 @@ def resume_job(domain: str) -> Tuple[bool, str]:
         return False, f"Job thread for {normalized} is not running."
     ctrl = get_job_control(normalized)
     if not ctrl:
+        return False, f"No control handle for {normalized}."
+    if not ctrl.request_resume():
+        return False, f"{normalized} is not paused."
+    job_set_status(normalized, "running", "Job resumed.")
+    job_log_append(normalized, "Job resumed by user.", "scheduler")
+    return True, f"{normalized} has been resumed."
+
+
+def skip_job_step(domain: str, step: str) -> Tuple[bool, str]:
+    """
+    Skip a specific pipeline step for a job.
+    Marks the step as done to prevent it from running.
+    """
+    normalized = (domain or "").strip().lower()
+    if not normalized:
+        return False, "Domain is required."
+    if not step:
+        return False, "Step name is required."
+    
+    # Validate step name
+    if step not in PIPELINE_STEPS:
+        return False, f"Invalid step name: {step}. Valid steps: {', '.join(PIPELINE_STEPS)}"
+    
+    with JOB_LOCK:
+        job = RUNNING_JOBS.get(normalized)
+        if not job:
+            return False, f"No active job for {normalized}."
+    
+    # Load state and mark step as done
+    state = load_state()
+    target = state.get("targets", {}).get(normalized)
+    
+    if not target:
+        return False, f"No target data found for {normalized}."
+    
+    flags = target.get("flags", {})
+    flag_name = f"{step}_done"
+    
+    # Check if already done
+    if flags.get(flag_name):
+        return False, f"Step '{step}' is already marked as done for {normalized}."
+    
+    # Mark as done
+    flags[flag_name] = True
+    target["flags"] = flags
+    save_state(state)
+    
+    # Update job step status
+    job_step_update(normalized, step, status="skipped", message="Skipped by user", progress=0)
+    job_log_append(normalized, f"Step '{step}' skipped by user.", "scheduler")
+    
+    return True, f"Step '{step}' has been skipped for {normalized}."
+
+
+def cancel_all_jobs() -> Tuple[bool, str, List[Dict[str, str]]]:
+    """
+    Cancel all running jobs by pausing them.
+    Returns list of results for each job.
+    """
+    with JOB_LOCK:
+        running_domains = [
+            domain for domain, job in RUNNING_JOBS.items()
+            if job.get("status") == "running" and job.get("thread") and job.get("thread").is_alive()
+        ]
+    
+    if not running_domains:
+        return True, "No running jobs to cancel.", []
+    
+    results = []
+    cancelled_count = 0
+    
+    for domain in running_domains:
+        success, message = pause_job(domain)
+        results.append({
+            "domain": domain,
+            "success": success,
+            "message": message,
+        })
+        if success:
+            cancelled_count += 1
+    
+    if cancelled_count == 0:
+        return False, "Failed to cancel any jobs.", results
+    elif cancelled_count < len(running_domains):
+        return True, f"Cancelled {cancelled_count} of {len(running_domains)} running jobs.", results
+    else:
+        return True, f"Successfully cancelled all {cancelled_count} running jobs.", results
+
+    if not ctrl:
         return False, f"{normalized} is not currently paused."
     if not ctrl.request_resume():
         return False, f"{normalized} is not paused."
@@ -11985,12 +12199,19 @@ def build_state_payload_summary() -> Dict[str, Any]:
     - nuclei/nikto finding counts (not full details)
     - screenshot path (not full metadata)
     
+    For performance with large datasets (200k+ subdomains), limits the number
+    of subdomains returned per domain to MAX_SUBDOMAINS_IN_SUMMARY (default 100).
+    Full data is available via the domain detail page.
+    
     This allows the dashboard to render basic views without loading full data.
     
     Optimizations:
     - Uses single JOIN query instead of N+1 queries (70-90% faster)
     - Batches subdomain processing per domain
+    - Limits subdomains per domain to prevent UI freezing
     """
+    MAX_SUBDOMAINS_IN_SUMMARY = 100  # Maximum subdomains to include per domain in summary
+    
     db = get_db()
     cursor = db.cursor()
     
@@ -12010,6 +12231,7 @@ def build_state_payload_summary() -> Dict[str, Any]:
     current_domain = None
     current_target = None
     subdomains = {}
+    subdomain_count = 0  # Track subdomains for current domain
     
     # Process results in a single pass
     for row in cursor:
@@ -12020,6 +12242,8 @@ def build_state_payload_summary() -> Dict[str, Any]:
             # Save previous domain's data if exists
             if current_domain is not None and current_target is not None:
                 current_target["subdomains"] = subdomains
+                current_target["total_subdomains"] = subdomain_count
+                current_target["subdomains_truncated"] = subdomain_count > MAX_SUBDOMAINS_IN_SUMMARY
                 # Calculate pending status
                 try:
                     current_target["pending"] = target_has_pending_work(current_target, config)
@@ -12039,10 +12263,18 @@ def build_state_payload_summary() -> Dict[str, Any]:
                 "comments": target_comments,
             }
             subdomains = {}
+            subdomain_count = 0
         
         # Process subdomain if present (LEFT JOIN may have NULL subdomain)
         subdomain = row[4]
         if subdomain is not None:
+            subdomain_count += 1
+            
+            # PERFORMANCE: Skip subdomains beyond the limit to prevent UI freezing
+            # Full data available in domain detail page
+            if subdomain_count > MAX_SUBDOMAINS_IN_SUMMARY:
+                continue
+            
             try:
                 full_data = json.loads(row[5])
                 
@@ -12088,6 +12320,8 @@ def build_state_payload_summary() -> Dict[str, Any]:
     # Save last domain's data
     if current_domain is not None and current_target is not None:
         current_target["subdomains"] = subdomains
+        current_target["total_subdomains"] = subdomain_count
+        current_target["subdomains_truncated"] = subdomain_count > MAX_SUBDOMAINS_IN_SUMMARY
         # Calculate pending status
         try:
             current_target["pending"] = target_has_pending_work(current_target, config)
@@ -14111,6 +14345,8 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             "/api/jobs/pause",
             "/api/jobs/resume",
             "/api/jobs/resume-all",
+            "/api/jobs/skip-step",
+            "/api/jobs/cancel-all",
             "/api/targets/resume",
             "/api/monitors",
             "/api/monitors/delete",
@@ -14193,6 +14429,20 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
 
         if self.path == "/api/jobs/resume-all":
             success, message, results = resume_all_paused_jobs()
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message, "results": results}, status=status)
+            return
+        
+        if self.path == "/api/jobs/skip-step":
+            domain = payload.get("domain", "")
+            step = payload.get("step", "")
+            success, message = skip_job_step(domain, step)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message}, status=status)
+            return
+        
+        if self.path == "/api/jobs/cancel-all":
+            success, message, results = cancel_all_jobs()
             status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
             self._send_json({"success": success, "message": message, "results": results}, status=status)
             return
