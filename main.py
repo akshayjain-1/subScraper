@@ -6898,7 +6898,10 @@ button:hover { background:#1d4ed8; }
     <section class="module" data-view="jobs">
       <div class="module-header">
         <h2>Active Jobs</h2>
-        <button class="btn secondary small" id="resume-all-btn" style="margin-left: auto;">Resume All Paused</button>
+        <div style="display: flex; gap: 8px; margin-left: auto;">
+          <button class="btn secondary small" id="cancel-all-btn">Cancel All</button>
+          <button class="btn secondary small" id="resume-all-btn">Resume All Paused</button>
+        </div>
       </div>
       <div class="module-body">
         <div id="jobs-list">
@@ -7999,15 +8002,25 @@ function renderJobControls(job) {
   return '';
 }
 
-function renderJobStep(name, info = {}) {
+function renderJobStep(name, info = {}, domain = '') {
   const status = info.status || 'pending';
   const message = info.message || '';
   const pct = info.progress !== undefined ? info.progress : (status === 'completed' ? 100 : 0);
+  
+  // Show skip button for pending/running steps (not completed, skipped, or error)
+  const canSkip = status === 'pending' || status === 'running' || status === 'queued';
+  const skipBtn = canSkip && domain ? 
+    `<button class="btn secondary small" data-skip-step="${escapeHtml(domain)}" data-step-name="${escapeHtml(name)}" style="margin-left: 8px;">Skip</button>` : 
+    '';
+  
   return `
     <div class="step-row">
       <div class="step-header">
         <span class="step-name">${escapeHtml(name.toUpperCase())}</span>
-        <span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span>
+          ${skipBtn}
+        </div>
       </div>
       <p class="muted">${escapeHtml(message)}</p>
       ${renderProgress(pct, status)}
@@ -8061,7 +8074,7 @@ function renderJobs(jobs) {
   const cards = pageJobs.map(job => {
     const progress = Math.max(0, Math.min(100, job.progress || 0));
     const steps = job.steps || {};
-    const stepsHtml = Object.keys(steps).map(step => renderJobStep(step, steps[step])).join('');
+    const stepsHtml = Object.keys(steps).map(step => renderJobStep(step, steps[step], job.domain)).join('');
     const logsHtml = renderLogEntries(job.logs || []);
     return `
       <div class="job-card">
@@ -10570,6 +10583,13 @@ jobsList.addEventListener('click', (event) => {
   if (resumeBtn) {
     const domain = resumeBtn.getAttribute('data-resume-job');
     handleJobControl('resume', domain, resumeBtn);
+    return;
+  }
+  const skipBtn = event.target.closest('[data-skip-step]');
+  if (skipBtn) {
+    const domain = skipBtn.getAttribute('data-skip-step');
+    const step = skipBtn.getAttribute('data-step-name');
+    handleSkipStep(domain, step, skipBtn);
   }
 });
 
@@ -10600,6 +10620,70 @@ if (resumeAllBtn) {
     }
   });
 }
+
+// Cancel All button handler
+const cancelAllBtn = document.getElementById('cancel-all-btn');
+if (cancelAllBtn) {
+  cancelAllBtn.addEventListener('click', async () => {
+    if (!confirm('Cancel all running jobs? They will be paused and can be resumed later.')) {
+      return;
+    }
+    const original = cancelAllBtn.textContent;
+    cancelAllBtn.disabled = true;
+    cancelAllBtn.textContent = 'Cancelling...';
+    try {
+      const resp = await fetch('/api/jobs/cancel-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json();
+      cancelAllBtn.textContent = data.message || 'Done';
+      if (data.success) {
+        fetchState();
+      }
+    } catch (err) {
+      cancelAllBtn.textContent = err.message || 'Failed';
+    } finally {
+      setTimeout(() => {
+        cancelAllBtn.textContent = original;
+        cancelAllBtn.disabled = false;
+      }, 2000);
+    }
+  });
+}
+
+async function handleSkipStep(domain, step, btn) {
+  if (!confirm(`Skip ${step.toUpperCase()} step for ${domain}? This will mark it as done without running.`)) {
+    return;
+  }
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Skipping...';
+  try {
+    const resp = await fetch('/api/jobs/skip-step', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain, step })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      btn.textContent = 'Skipped';
+      fetchState();
+    } else {
+      btn.textContent = 'Failed';
+      alert(data.message || 'Failed to skip step');
+    }
+  } catch (err) {
+    btn.textContent = 'Error';
+    alert(err.message || 'Failed to skip step');
+  } finally {
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
 
 document.addEventListener('click', (event) => {
   const header = event.target.closest('.collapsible-header');
@@ -11858,6 +11942,95 @@ def resume_job(domain: str) -> Tuple[bool, str]:
     if not thread or not thread.is_alive():
         return False, f"Job thread for {normalized} is not running."
     ctrl = get_job_control(normalized)
+    if not ctrl:
+        return False, f"No control handle for {normalized}."
+    if not ctrl.request_resume():
+        return False, f"{normalized} is not paused."
+    job_set_status(normalized, "running", "Job resumed.")
+    job_log_append(normalized, "Job resumed by user.", "scheduler")
+    return True, f"{normalized} has been resumed."
+
+
+def skip_job_step(domain: str, step: str) -> Tuple[bool, str]:
+    """
+    Skip a specific pipeline step for a job.
+    Marks the step as done to prevent it from running.
+    """
+    normalized = (domain or "").strip().lower()
+    if not normalized:
+        return False, "Domain is required."
+    if not step:
+        return False, "Step name is required."
+    
+    # Validate step name
+    if step not in PIPELINE_STEPS:
+        return False, f"Invalid step name: {step}. Valid steps: {', '.join(PIPELINE_STEPS)}"
+    
+    with JOB_LOCK:
+        job = RUNNING_JOBS.get(normalized)
+        if not job:
+            return False, f"No active job for {normalized}."
+    
+    # Load state and mark step as done
+    state = load_state()
+    target = state.get("targets", {}).get(normalized)
+    
+    if not target:
+        return False, f"No target data found for {normalized}."
+    
+    flags = target.get("flags", {})
+    flag_name = f"{step}_done"
+    
+    # Check if already done
+    if flags.get(flag_name):
+        return False, f"Step '{step}' is already marked as done for {normalized}."
+    
+    # Mark as done
+    flags[flag_name] = True
+    target["flags"] = flags
+    save_state(state)
+    
+    # Update job step status
+    job_step_update(normalized, step, status="skipped", message="Skipped by user", progress=0)
+    job_log_append(normalized, f"Step '{step}' skipped by user.", "scheduler")
+    
+    return True, f"Step '{step}' has been skipped for {normalized}."
+
+
+def cancel_all_jobs() -> Tuple[bool, str, List[Dict[str, str]]]:
+    """
+    Cancel all running jobs by pausing them.
+    Returns list of results for each job.
+    """
+    with JOB_LOCK:
+        running_domains = [
+            domain for domain, job in RUNNING_JOBS.items()
+            if job.get("status") == "running" and job.get("thread") and job.get("thread").is_alive()
+        ]
+    
+    if not running_domains:
+        return True, "No running jobs to cancel.", []
+    
+    results = []
+    cancelled_count = 0
+    
+    for domain in running_domains:
+        success, message = pause_job(domain)
+        results.append({
+            "domain": domain,
+            "success": success,
+            "message": message,
+        })
+        if success:
+            cancelled_count += 1
+    
+    if cancelled_count == 0:
+        return False, "Failed to cancel any jobs.", results
+    elif cancelled_count < len(running_domains):
+        return True, f"Cancelled {cancelled_count} of {len(running_domains)} running jobs.", results
+    else:
+        return True, f"Successfully cancelled all {cancelled_count} running jobs.", results
+
     if not ctrl:
         return False, f"{normalized} is not currently paused."
     if not ctrl.request_resume():
@@ -14172,6 +14345,8 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
             "/api/jobs/pause",
             "/api/jobs/resume",
             "/api/jobs/resume-all",
+            "/api/jobs/skip-step",
+            "/api/jobs/cancel-all",
             "/api/targets/resume",
             "/api/monitors",
             "/api/monitors/delete",
@@ -14254,6 +14429,20 @@ class CommandCenterHandler(BaseHTTPRequestHandler):
 
         if self.path == "/api/jobs/resume-all":
             success, message, results = resume_all_paused_jobs()
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message, "results": results}, status=status)
+            return
+        
+        if self.path == "/api/jobs/skip-step":
+            domain = payload.get("domain", "")
+            step = payload.get("step", "")
+            success, message = skip_job_step(domain, step)
+            status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
+            self._send_json({"success": success, "message": message}, status=status)
+            return
+        
+        if self.path == "/api/jobs/cancel-all":
+            success, message, results = cancel_all_jobs()
             status = HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
             self._send_json({"success": success, "message": message, "results": results}, status=status)
             return
