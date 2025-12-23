@@ -5322,6 +5322,10 @@ def httpx_scan(subs_file: Path, domain: str, config: Optional[Dict[str, Any]] = 
         "-o", str(out_json),
         "-timeout", "10",
         "-follow-redirects",
+        "-title",         # Extract page titles
+        "-tech-detect",   # Detect technologies  
+        "-status-code",   # Show status codes
+        "-server",        # Extract server headers
         "-v",
     ]
     context = {
@@ -5409,7 +5413,7 @@ def capture_screenshots(
         "scan",
         "file",
         "-f", str(target_file),
-        "-P", str(dest_dir),
+        "-s", str(dest_dir),
         "--db", str(db_path),
         "--write-db",
         "--log-level", "error",
