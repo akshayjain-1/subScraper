@@ -5129,6 +5129,10 @@ def run_downstream_pipeline(
                 job_log_append(job_domain, "Screenshot batch failed.", "screenshots")
                 update_step("screenshots", status="error", message="Screenshot capture failed.", progress=100)
                 # Mark screenshot step as done on failure to prevent infinite retry
+                # Record the failed attempt for hosts in this batch
+                failed_hosts = [host for host, url in screenshot_targets]
+                if failed_hosts:
+                    mark_hosts_scanned(state, domain, failed_hosts, "screenshots")
                 flags["screenshots_done"] = True
                 save_state(state)
                 break
