@@ -10082,9 +10082,7 @@ async function renderReportDetail(domain) {
   if (!detail) return;
   
   // Show loading state
-  selectedReportDomain = domain;
   detail.innerHTML = '<div class="section-placeholder">Loading full report data...</div>';
-  updateReportNavSelection();
   
   // Fetch full domain data from API (not truncated summary)
   let info;
@@ -10097,13 +10095,12 @@ async function renderReportDetail(domain) {
     
     // Update latestTargetsData with full data so it's available for future use
     latestTargetsData[domain] = info;
+    
+    // Set selected domain only after successful load
+    selectedReportDomain = domain;
+    updateReportNavSelection();
   } catch (err) {
     detail.innerHTML = `<div class="section-placeholder">Error loading report: ${escapeHtml(err.message)}</div>`;
-    return;
-  }
-  
-  if (!info) {
-    detail.innerHTML = '<div class="section-placeholder">Select a program to view its report.</div>';
     return;
   }
   const stats = computeReportStats(info);
