@@ -2808,7 +2808,9 @@ def expand_wildcard_targets(raw: str, config: Optional[Dict[str, Any]] = None) -
         if not normalized:
             continue
         
-        # Check for subdomain wildcard prefix
+        # Check for subdomain wildcard prefix (*.subdomain.domain.com)
+        # We check once before stripping to detect if ANY wildcard was present
+        # Multiple wildcards like *.*.example.com are still detected as broad_scope
         is_broad_scope = normalized.startswith("*.")
         while normalized.startswith("*."):
             normalized = normalized[2:]
@@ -6312,9 +6314,14 @@ def _start_job_thread(job: Dict[str, Any]) -> None:
 
     def timeout_watcher():
         """Watch for job timeout and terminate if exceeded."""
+        # Wait for either timeout or job completion
         timeout_triggered.wait(timeout=job_timeout_seconds)
+        
+        # Check if job completed before timeout (event was set by job thread)
+        # If event is already set, job completed normally - do nothing
+        # Otherwise, timeout occurred - set event and mark job as timed out
         if not timeout_triggered.is_set():
-            # Timeout occurred
+            # Timeout occurred - atomically set the event
             timeout_triggered.set()
             log(f"⏱️ Job timeout reached for {domain} after {job_timeout_seconds} seconds. Terminating job...")
             job_log_append(domain, f"⏱️ Job timeout reached after {job_timeout_seconds} seconds. Terminating...", "timeout-watcher")
