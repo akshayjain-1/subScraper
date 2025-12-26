@@ -6339,14 +6339,11 @@ def _start_job_thread(job: Dict[str, Any]) -> None:
         thread.start()
         if timer_thread:
             timer_thread.start()
-    
-    job_log_append(domain, "Job dispatched to worker.", "scheduler")
-    if job_timeout_seconds and job_timeout_seconds > 0:
-        job_log_append(domain, f"Job timeout set to {job_timeout_seconds} seconds.", "scheduler")
-        # Start thread while holding lock to prevent race condition
-        # This ensures count_active_jobs_locked() sees the thread immediately
-        thread.start()
-    job_log_append(domain, "Job dispatched to worker.", "scheduler")
+        
+        # Log job start inside the lock to maintain consistency
+        job_log_append(domain, "Job dispatched to worker.", "scheduler")
+        if job_timeout_seconds and job_timeout_seconds > 0:
+            job_log_append(domain, f"Job timeout set to {job_timeout_seconds} seconds.", "scheduler")
 
 
 def schedule_jobs() -> None:
