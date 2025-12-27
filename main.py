@@ -7128,6 +7128,11 @@ button:hover { background:#1d4ed8; }
       <a class="nav-link" data-view="guide" href="#guide">User Guide</a>
     </nav>
     <div class="sidebar-footer">
+      <div id="user-info" style="padding: 12px; background: #0f172a; border-radius: 8px; margin-bottom: 12px;">
+        <div style="font-size: 13px; color: #94a3b8; margin-bottom: 4px;">Logged in as</div>
+        <div style="font-weight: 600; margin-bottom: 8px;" id="username-display">Loading...</div>
+        <button onclick="logout()" style="width: 100%; padding: 8px; background: #dc2626; margin-top: 0;">Logout</button>
+      </div>
       Outputs live in <code>recon_data/</code>. Keep this UI open while jobs run.
     </div>
   </aside>
@@ -7374,6 +7379,7 @@ button:hover { background:#1d4ed8; }
         
         <div class="settings-tabs">
           <button class="settings-tab active" data-tab="general">General</button>
+          <button class="settings-tab" data-tab="users">User Management</button>
           <button class="settings-tab" data-tab="toggles">Tool Toggles</button>
           <button class="settings-tab" data-tab="api-keys">API Keys</button>
           <button class="settings-tab" data-tab="concurrency">Concurrency</button>
@@ -7410,6 +7416,43 @@ button:hover { background:#1d4ed8; }
               <label>Amass timeout (seconds)
                 <input id="settings-amass-timeout" type="number" name="amass_timeout" min="0" />
               </label>
+            </div>
+          </div>
+
+          <div class="settings-subtab-content" data-tab-content="users">
+            <div class="card">
+              <h3>User Management</h3>
+              <p class="muted">Manage user accounts (Admin only)</p>
+              
+              <div id="user-management-container">
+                <div style="margin-bottom: 24px;">
+                  <h4>Create New User</h4>
+                  <form id="create-user-form" style="border: 1px solid #1e293b; padding: 16px; border-radius: 8px; background: #0b152c;">
+                    <label>Username
+                      <input id="new-username" type="text" placeholder="username" required />
+                    </label>
+                    <label>Password
+                      <input id="new-password" type="password" placeholder="password" required />
+                    </label>
+                    <label>Confirm Password
+                      <input id="new-password-confirm" type="password" placeholder="confirm password" required />
+                    </label>
+                    <label class="checkbox">
+                      <input id="new-user-admin" type="checkbox" />
+                      Admin user (has full access and can manage users)
+                    </label>
+                    <button type="submit">Create User</button>
+                    <div id="create-user-status" class="status"></div>
+                  </form>
+                </div>
+                
+                <div>
+                  <h4>Existing Users</h4>
+                  <div id="users-list" style="border: 1px solid #1e293b; padding: 16px; border-radius: 8px; background: #0b152c;">
+                    Loading users...
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -7892,6 +7935,36 @@ button:hover { background:#1d4ed8; }
 </div>
 <script>
 console.log('[DEBUG] Script loading started');
+
+// Load current user info
+async function loadUserInfo() {
+  try {
+    const resp = await fetch('/api/auth/user');
+    const data = await resp.json();
+    if (data.success && data.user) {
+      const displayName = data.user.username + (data.user.is_admin ? ' (Admin)' : '');
+      document.getElementById('username-display').textContent = displayName;
+    }
+  } catch (err) {
+    console.error('Failed to load user info:', err);
+  }
+}
+
+// Logout function
+async function logout() {
+  if (!confirm('Are you sure you want to logout?')) return;
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  } catch (err) {
+    console.error('Logout failed:', err);
+    alert('Logout failed. Please try again.');
+  }
+}
+
+// Load user info on page load
+loadUserInfo();
+
 const navLinks = document.querySelectorAll('.nav-link');
 const viewSections = document.querySelectorAll('.module');
 const SEVERITY_SCALE = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'NONE'];
@@ -8119,6 +8192,102 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// User management functions
+async function loadUsers() {
+  try {
+    const resp = await fetch('/api/users');
+    const data = await resp.json();
+    if (data.success) {
+      displayUsers(data.users);
+    } else {
+      document.getElementById('users-list').innerHTML = `<p class="muted">${escapeHtml(data.message || 'Failed to load users')}</p>`;
+    }
+  } catch (err) {
+    console.error('Failed to load users:', err);
+    document.getElementById('users-list').innerHTML = '<p class="muted">Failed to load users</p>';
+  }
+}
+
+function displayUsers(users) {
+  const listEl = document.getElementById('users-list');
+  if (!users || users.length === 0) {
+    listEl.innerHTML = '<p class="muted">No users found</p>';
+    return;
+  }
+  
+  const html = users.map(user => `
+    <div style="padding: 12px; border: 1px solid #1e293b; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <strong>${escapeHtml(user.username)}</strong>
+        ${user.is_admin ? '<span class="badge" style="background: #3b82f6;">Admin</span>' : ''}
+        <div class="muted" style="font-size: 12px; margin-top: 4px;">Created: ${fmtTime(user.created_at)}</div>
+      </div>
+    </div>
+  `).join('');
+  
+  listEl.innerHTML = html;
+}
+
+// Create user form handler
+const createUserForm = document.getElementById('create-user-form');
+if (createUserForm) {
+  createUserForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const statusEl = document.getElementById('create-user-status');
+    statusEl.textContent = '';
+    statusEl.className = 'status';
+    
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-password').value;
+    const passwordConfirm = document.getElementById('new-password-confirm').value;
+    const isAdmin = document.getElementById('new-user-admin').checked;
+    
+    if (!username || !password) {
+      statusEl.textContent = 'Username and password are required';
+      statusEl.className = 'status error';
+      return;
+    }
+    
+    if (password !== passwordConfirm) {
+      statusEl.textContent = 'Passwords do not match';
+      statusEl.className = 'status error';
+      return;
+    }
+    
+    try {
+      const resp = await fetch('/api/users/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, is_admin: isAdmin })
+      });
+      
+      const data = await resp.json();
+      if (data.success) {
+        statusEl.textContent = data.message;
+        statusEl.className = 'status success';
+        createUserForm.reset();
+        // Reload users list
+        loadUsers();
+      } else {
+        statusEl.textContent = data.message || 'Failed to create user';
+        statusEl.className = 'status error';
+      }
+    } catch (err) {
+      console.error('Failed to create user:', err);
+      statusEl.textContent = 'An error occurred';
+      statusEl.className = 'status error';
+    }
+  });
+}
+
+// Load users when switching to users tab
+const userMgmtTab = document.querySelector('[data-tab="users"]');
+if (userMgmtTab) {
+  userMgmtTab.addEventListener('click', () => {
+    loadUsers();
+  });
 }
 
 function fmtTime(value) {
