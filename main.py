@@ -1299,6 +1299,44 @@ def cleanup_expired_sessions() -> None:
             log(f"Cleaned up {len(expired_tokens)} expired session(s)")
 
 
+# Session cleanup worker
+SESSION_CLEANUP_THREAD: Optional[threading.Thread] = None
+SESSION_CLEANUP_STOP = False
+SESSION_CLEANUP_INTERVAL = 600  # 10 minutes
+
+
+def session_cleanup_worker() -> None:
+    """Background worker that periodically cleans up expired sessions."""
+    global SESSION_CLEANUP_STOP
+    log("Session cleanup worker started")
+    
+    while not SESSION_CLEANUP_STOP:
+        try:
+            time.sleep(SESSION_CLEANUP_INTERVAL)
+            if not SESSION_CLEANUP_STOP:
+                cleanup_expired_sessions()
+        except Exception as e:
+            log(f"Error in session cleanup worker: {e}")
+            time.sleep(60)  # Sleep a bit on error
+
+
+def start_session_cleanup_worker() -> None:
+    """Start the session cleanup worker thread."""
+    global SESSION_CLEANUP_THREAD, SESSION_CLEANUP_STOP
+    
+    if SESSION_CLEANUP_THREAD and SESSION_CLEANUP_THREAD.is_alive():
+        return
+    
+    SESSION_CLEANUP_STOP = False
+    SESSION_CLEANUP_THREAD = threading.Thread(
+        target=session_cleanup_worker,
+        name="SessionCleanup",
+        daemon=True
+    )
+    SESSION_CLEANUP_THREAD.start()
+    log("Session cleanup worker initialized")
+
+
 def _normalize_tool_flag_templates(value: Any) -> Dict[str, str]:
     mapping = {name: "" for name in TEMPLATE_AWARE_TOOLS}
     if not isinstance(value, dict):
@@ -7379,7 +7417,7 @@ button:hover { background:#1d4ed8; }
         
         <div class="settings-tabs">
           <button class="settings-tab active" data-tab="general">General</button>
-          <button class="settings-tab" data-tab="users">User Management</button>
+          <button class="settings-tab" data-tab="users" id="user-mgmt-tab" style="display: none;">User Management</button>
           <button class="settings-tab" data-tab="toggles">Tool Toggles</button>
           <button class="settings-tab" data-tab="api-keys">API Keys</button>
           <button class="settings-tab" data-tab="concurrency">Concurrency</button>
@@ -7944,6 +7982,14 @@ async function loadUserInfo() {
     if (data.success && data.user) {
       const displayName = data.user.username + (data.user.is_admin ? ' (Admin)' : '');
       document.getElementById('username-display').textContent = displayName;
+      
+      // Show user management tab for admins only
+      if (data.user.is_admin) {
+        const userMgmtTab = document.getElementById('user-mgmt-tab');
+        if (userMgmtTab) {
+          userMgmtTab.style.display = 'block';
+        }
+      }
     }
   } catch (err) {
     console.error('Failed to load user info:', err);
@@ -15122,16 +15168,6 @@ form.addEventListener('submit', async (e) => {
             return
         
         # User management endpoints (admin only)
-        if self.path == "/api/users":
-            admin = self._require_admin()
-            if not admin:
-                return
-            
-            # GET users list via POST for simplicity (could be GET but keeping pattern)
-            users = list_users()
-            self._send_json({"success": True, "users": users})
-            return
-        
         if self.path == "/api/users/create":
             admin = self._require_admin()
             if not admin:
@@ -15512,6 +15548,7 @@ def run_server(host: str, port: int, interval: int) -> None:
     
     start_monitor_worker()
     start_system_resource_worker()  # Start system resource monitoring
+    start_session_cleanup_worker()  # Start session cleanup
     generate_html_dashboard()
     server = ThreadingHTTPServer((host, port), CommandCenterHandler)
     log(f"Recon Command Center available at http://{host}:{port}")
