@@ -29,6 +29,7 @@ import secrets
 import shlex
 import shutil
 import sqlite3
+import ssl
 import subprocess
 import sys
 import tarfile
@@ -8426,7 +8427,7 @@ async function editUser(userId, username, isAdmin) {
   }
   
   // Check if any changes were made
-  if (!payload.username && !payload.password && !payload.is_admin && payload.is_admin !== false) {
+  if (!payload.username && !payload.password && !('is_admin' in payload)) {
     alert('No changes specified');
     return;
   }
@@ -15416,8 +15417,8 @@ form.addEventListener('submit', async (e) => {
                 self._send_json({"success": False, "message": "Invalid user ID"}, status=HTTPStatus.BAD_REQUEST)
                 return
             
-            username = payload.get("username", "").strip() if payload.get("username") else None
-            password = payload.get("password", "").strip() if payload.get("password") else None
+            username = payload.get("username", "").strip() or None
+            password = payload.get("password", "").strip() or None
             is_admin = payload.get("is_admin") if "is_admin" in payload else None
             
             success, message = update_user(user_id, username=username, password=password, is_admin=is_admin)
@@ -15802,9 +15803,6 @@ def generate_self_signed_cert(cert_file: Path, key_file: Path) -> bool:
     Returns True if successful, False otherwise.
     """
     try:
-        import ssl
-        from subprocess import run, PIPE
-        
         log("Generating self-signed SSL certificate...")
         
         # Use OpenSSL to generate a self-signed certificate
@@ -15817,7 +15815,7 @@ def generate_self_signed_cert(cert_file: Path, key_file: Path) -> bool:
             "-out", str(cert_file)
         ]
         
-        result = run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 0:
             log(f"✓ Self-signed certificate generated:")
@@ -15862,8 +15860,6 @@ def run_server(host: str, port: int, interval: int, use_https: bool = False, cer
     
     # Configure HTTPS if requested
     if use_https:
-        import ssl
-        
         # Determine certificate and key paths
         if cert_file and key_file:
             cert_path = Path(cert_file)
